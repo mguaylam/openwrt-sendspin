@@ -20,7 +20,7 @@ once it has proven itself here.
 | Build with the OpenWrt SDK | verified for `ramips/mt7621` on 25.12.5; other targets through CI |
 | Install and service on a router | not yet |
 | Playback on hardware | not yet |
-| Big-endian targets (e.g. ath79) | expected to build; playback is known to be wrong upstream for Opus, 16-bit FLAC and software volume |
+| Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
 
 ## Hardware under test
 
@@ -114,6 +114,16 @@ sendspin-cli status --control-socket /var/run/sendspin-cli/main.sock
   spare the flash.
 - **No MIPS16.** Audio decoding runs on the CPU in real time, so the package is
   built without MIPS16, like mpd and pulseaudio.
+
+## Known limitations
+
+- **Big-endian targets** (e.g. `ath79`, `mips_24kc`): the package builds, but
+  Opus, 16-bit FLAC and software volume are expected to play as noise, because
+  a few places in the upstream code handle samples in host byte order. Found by
+  reading the code, not yet reproduced. Little-endian targets are not affected.
+  Tracked in [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
+- **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
+  an address; `mdns:` server discovery is not available.
 
 ## Continuous integration
 
