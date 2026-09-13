@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=sendspin-cli
+PKG_VERSION:=0.1.6
+PKG_RELEASE:=1
+
+PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
+PKG_HASH:=c7f4110a9465843db910c95a628a0f777b7e1b79fe1281866755dddf370318a9
+PKG_BUILD_DIR:=$(BUILD_DIR)/sendspin-cpp-cli-$(PKG_VERSION)
+
+PKG_MAINTAINER:=Michaël Guay-Lambert <michaelguaylambert@me.com>
+PKG_LICENSE:=Apache-2.0 BSD-3-Clause MIT
+PKG_LICENSE_FILES:=LICENSE
+
+PKG_BUILD_FLAGS:=no-mips16
+
+# The versions sendspin-cli v$(PKG_VERSION) pins through FetchContent
+# (SENDSPIN_GIT_TAG, then sendspin-cpp's cmake/host.cmake).
+SENDSPIN_CPP_VERSION:=0.7.2
+ARDUINOJSON_VERSION:=7.4.1
+IXWEBSOCKET_VERSION:=11.4.5
+MICRO_FLAC_VERSION:=0.1.1
+
+include $(INCLUDE_DIR)/package.mk
+include $(INCLUDE_DIR)/cmake.mk
+
+define Package/sendspin-cli
+  SECTION:=sound
+  CATEGORY:=Sound
+  TITLE:=Sendspin synchronized audio player
+  URL:=https://github.com/Sendspin/sendspin-cpp-cli
+  DEPENDS:=+alsa-lib +libatomic +libopus +libstdcpp +umdns
+  USERID:=sendspin:audio=29
+endef
+
+define Package/sendspin-cli/description
+  Headless player for Sendspin, the synchronized multi-room audio protocol
+  used by Music Assistant. It plays through ALSA and is announced over mDNS
+  so a Sendspin server can discover it.
+endef
+
+define Package/sendspin-cli/conffiles
+/etc/config/sendspin-cli
+endef
+
+define Download/sendspin-cpp
+  URL:=https://codeload.github.com/Sendspin/sendspin-cpp/tar.gz/v$(SENDSPIN_CPP_VERSION)?
+  FILE:=sendspin-cpp-$(SENDSPIN_CPP_VERSION).tar.gz
+  HASH:=2f8ecb919ab58c195c3a5fbfc097f59b2d502a1716979bcb1a0b7a5f2ccccf8d
+endef
+$(eval $(call Download,sendspin-cpp))
+
+define Download/arduinojson
+  URL:=https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/v$(ARDUINOJSON_VERSION)?
+  FILE:=ArduinoJson-$(ARDUINOJSON_VERSION).tar.gz
+  HASH:=4db7245408c58c4869c135aece5e92c784d8026f5dbc6efd0485e52b84264d10
+endef
+$(eval $(call Download,arduinojson))
+
+define Download/ixwebsocket
+  URL:=https://codeload.github.com/machinezone/IXWebSocket/tar.gz/v$(IXWEBSOCKET_VERSION)?
+  FILE:=IXWebSocket-$(IXWEBSOCKET_VERSION).tar.gz
+  HASH:=c5fc225edec32bf7d583e55347ef2c9c4940d005c13ef5e848354a85602f5fd6
+endef
+$(eval $(call Download,ixwebsocket))
+
+define Download/micro-flac
+  URL:=https://codeload.github.com/esphome-libs/micro-flac/tar.gz/v$(MICRO_FLAC_VERSION)?
+  FILE:=micro-flac-$(MICRO_FLAC_VERSION).tar.gz
+  HASH:=4cc9c69f1ec06e7d0a7bd116bc61cc3f398d056eb9b2e9402a8a4790e307e854
+endef
+$(eval $(call Download,micro-flac))
+
+DEPS_DIR:=$(PKG_BUILD_DIR)/openwrt-deps
+
+# $(1): directory under $(DEPS_DIR), $(2): archive in $(DL_DIR)
+define Prepare/dependency
+	mkdir -p $(DEPS_DIR)/$(1)
+	$(HOST_TAR) -C $(DEPS_DIR)/$(1) --strip-components=1 -xzf $(DL_DIR)/$(2)
+endef
+
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	$(call Prepare/dependency,sendspin-cpp,sendspin-cpp-$(SENDSPIN_CPP_VERSION).tar.gz)
+	$(call Prepare/dependency,ArduinoJson,ArduinoJson-$(ARDUINOJSON_VERSION).tar.gz)
+	$(call Prepare/dependency,IXWebSocket,IXWebSocket-$(IXWEBSOCKET_VERSION).tar.gz)
+	$(call Prepare/dependency,micro-flac,micro-flac-$(MICRO_FLAC_VERSION).tar.gz)
+	$(CP) ./cmake/micro-opus $(DEPS_DIR)/
+endef
+
+# Hand every FetchContent dependency a local source tree and forbid any
+# download. micro-opus is replaced by a shim over the feed's libopus, and
+# micro-flac's Ogg container support, which Sendspin does not use, is left out
+# along with the micro-ogg-demuxer submodule it needs.
+CMAKE_OPTIONS += \
+	-DFETCHCONTENT_FULLY_DISCONNECTED=ON \
+	-DFETCHCONTENT_SOURCE_DIR_SENDSPIN=$(DEPS_DIR)/sendspin-cpp \
+	-DFETCHCONTENT_SOURCE_DIR_ARDUINOJSON=$(DEPS_DIR)/ArduinoJson \
+	-DFETCHCONTENT_SOURCE_DIR_IXWEBSOCKET=$(DEPS_DIR)/IXWebSocket \
+	-DFETCHCONTENT_SOURCE_DIR_MICRO_FLAC=$(DEPS_DIR)/micro-flac \
+	-DFETCHCONTENT_SOURCE_DIR_MICRO_OPUS=$(DEPS_DIR)/micro-opus \
+	-DMICRO_FLAC_ENABLE_OGG=OFF \
+	-DSENDSPIN_CLI_BUILD_TESTS=OFF \
+	-DSENDSPIN_CLI_WITH_ALSA=ON \
+	-DSENDSPIN_CLI_WITH_MDNS=OFF \
+	-DSENDSPIN_CLI_WITH_PIPEWIRE=OFF \
+	-DSENDSPIN_CLI_WITH_PORTAUDIO=OFF \
+	-DSENDSPIN_CLI_WITH_PULSE=OFF \
+	-DSENDSPIN_CLI_WERROR=OFF
+
+# 64-bit std::atomic needs libatomic on 32-bit targets without those ops
+TARGET_LDFLAGS += -latomic
+
+define Package/sendspin-cli/install
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/sendspin-cli $(1)/usr/bin/
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_CONF) ./files/sendspin-cli.config $(1)/etc/config/sendspin-cli
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/sendspin-cli.init $(1)/etc/init.d/sendspin-cli
+endef
+
+$(eval $(call BuildPackage,sendspin-cli))
