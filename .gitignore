@@ -1,0 +1,24 @@
+# Output of the OpenWrt SDK when it runs over this checkout
+# (openwrt/gh-action-sdk moves bin/ and logs/ into the workspace)
+/bin/
+/logs/
+
+# A local SDK unpacked next to the feed, and what it produces
+/sdk/
+/openwrt-sdk-*/
+/dl/
+/build_dir/
+/staging_dir/
+/feeds/
+/tmp/
+.config
+.config.old
+
+# Built packages
+*.apk
+*.ipk
+
+# quilt and patch leftovers
+.pc/
+*.orig
+*.rej
