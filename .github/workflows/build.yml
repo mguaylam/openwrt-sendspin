@@ -1,0 +1,71 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    name: Find packages
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.find.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Every <category>/<package>/Makefile in the feed. Naming the packages
+      # makes gh-action-sdk run its per-package checks (download, hash,
+      # patch refresh, shfmt on init scripts) rather than a bare build.
+      - id: find
+        run: |
+          list=$(find . -mindepth 3 -maxdepth 3 -name Makefile -not -path './.github/*' \
+            -printf '%h\n' | xargs -r -n1 basename | sort | tr '\n' ' ')
+          list=${list% }
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "Packages: ${list:-none}"
+
+  build:
+    name: ${{ matrix.target }} ${{ matrix.release }}
+    needs: packages
+    if: needs.packages.outputs.list != ''
+    runs-on: ubuntu-latest
+    # Snapshot is what an openwrt/packages PR builds against; report it,
+    # but don't let a broken snapshot SDK fail the run.
+    continue-on-error: ${{ matrix.release == 'main' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        release:
+          - 25.12.5
+          - main
+        target:
+          - ramips-mt7621     # mipsel_24kc: little-endian, soft-float (test hardware)
+          - ath79-generic     # mips_24kc: big-endian, soft-float
+          - mediatek-filogic  # aarch64_cortex-a53
+          - x86-64            # x86_64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build with the OpenWrt SDK
+        uses: openwrt/gh-action-sdk@v11
+        env:
+          ARCH: ${{ matrix.target }}-${{ matrix.release }}
+          FEEDNAME: sendspin
+          PACKAGES: ${{ needs.packages.outputs.list }}
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ${{ matrix.target }}-${{ matrix.release }}
+          path: |
+            bin/packages/*/sendspin/*.apk
+            logs/
+          if-no-files-found: warn
