@@ -174,8 +174,9 @@ service umdns reload
 - [ ] Follow up on openwrt/mdnsd#36 if it has had no review by 2026-09-28,
   on the pull request or on the openwrt-devel mailing list.
 - [ ] Remove the USB DAC workaround (`files/sendspin-cli.sound-hotplug`) once
-  sendspin-cli recovers from a replugged DAC on its own; reported as
-  [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54).
+  [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54)
+  is resolved in a sendspin-cli release, and retest unplugging the DAC during
+  playback without it.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
