@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sendspin-cli
 PKG_VERSION:=0.1.6
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
@@ -121,6 +121,8 @@ define Package/sendspin-cli/install
 	$(INSTALL_CONF) ./files/sendspin-cli.config $(1)/etc/config/sendspin-cli
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/sendspin-cli.init $(1)/etc/init.d/sendspin-cli
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
+	$(INSTALL_DATA) ./files/sendspin-cli.hotplug $(1)/etc/hotplug.d/iface/50-sendspin-cli
 endef
 
 $(eval $(call BuildPackage,sendspin-cli))

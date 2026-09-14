@@ -22,7 +22,7 @@ once it has proven itself here.
 | Install and service on a router | verified on the DIR-3040 |
 | Playback from Music Assistant, multi-room | verified on the DIR-3040 |
 | Rediscovery after a service restart | verified |
-| Rediscovery after a router reboot | needs a patched umdns — see [known limitations](#known-limitations) |
+| Rediscovery after a router reboot | verified, through a workaround for umdns — see [known limitations](#known-limitations) |
 | Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
 
 ## Hardware under test
@@ -146,16 +146,28 @@ service umdns reload
   a few places in the upstream code handle samples in host byte order. Found by
   reading the code, not yet reproduced. Little-endian targets are not affected.
   Tracked in [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
-- **Rediscovery after a router reboot** can fail with the umdns shipped in
-  OpenWrt 25.12, on networks with an mDNS reflector. umdns hears its own
-  probe echoed back, takes its own host name for a conflict and stops
-  announcing, and it does not announce service instances when an interface
-  comes up. Restarting the service (`service sendspin-cli restart`) brings the
-  player back. Fixes are proposed upstream in
+- **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
+  service instances when a network comes up, and on networks with an mDNS
+  reflector it takes its own reflected probe for a name conflict and stops
+  announcing. Left alone, the player is not rediscovered after a reboot. The
+  package works around it with `/etc/hotplug.d/iface/50-sendspin-cli`, which
+  restarts the player when a network umdns announces on comes up or changes
+  address; a renewed DHCP lease with the same address does not restart it.
+  Fixes are proposed upstream in
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36); details in
   [#5](https://github.com/mguaylam/openwrt-sendspin/issues/5).
 - **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
   an address; `mdns:` server discovery is not available.
+
+## TODO
+
+- [ ] Remove the umdns workaround (`files/sendspin-cli.hotplug`) once
+  [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36) ships in an
+  OpenWrt release, and retest rediscovery after a reboot without it.
+- [ ] Follow up on openwrt/mdnsd#36 if it has had no review by 2026-09-28,
+  on the pull request or on the openwrt-devel mailing list.
+- [ ] Fix playback on big-endian targets
+  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
 ## Continuous integration
 
