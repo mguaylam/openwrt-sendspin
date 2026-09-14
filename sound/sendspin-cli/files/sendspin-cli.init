@@ -69,6 +69,27 @@ start_service() {
 	config_foreach validate_player_section player start_player
 }
 
+# The player says goodbye with reason 'shutdown' whenever it stops, and a
+# server takes that at its word: it reconnects only once mDNS announces the
+# player again. umdns announces a service when it appears and withdraws it when
+# it disappears, but a restart that swaps it for an identical one does neither.
+# So withdraw the announcement once the player has actually exited; umdns
+# announces it again a few seconds after it starts. A configuration reload is
+# a full restart for the same reason.
+service_stopped() {
+	local wait=10
+
+	while procd_running sendspin-cli && [ "$wait" -gt 0 ]; do
+		sleep 1
+		wait=$((wait - 1))
+	done
+	ubus -t 2 call umdns reload > /dev/null 2>&1
+}
+
+reload_service() {
+	restart
+}
+
 service_triggers() {
 	procd_add_reload_trigger sendspin-cli
 	procd_add_validation validate_player_section
