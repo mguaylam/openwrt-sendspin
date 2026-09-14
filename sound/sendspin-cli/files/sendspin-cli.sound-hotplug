@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# When a USB DAC is unplugged and plugged back in, sendspin-cli notices and
+# reopens it, but then stops feeding it: playback stutters in a loop of
+# underruns until the player is restarted, while a restarted player plays
+# normally. So restart the player when a playback device appears. Remove once
+# sendspin-cli recovers from this on its own.
+
+[ "$ACTION" = add ] || exit 0
+
+case "$DEVNAME" in
+snd/pcmC*D*p) ;;
+*) exit 0 ;;
+esac
+
+/etc/init.d/sendspin-cli running || exit 0
+logger -t sendspin-cli "Restarting after $DEVNAME appeared"
+/etc/init.d/sendspin-cli restart > /dev/null 2>&1 &
