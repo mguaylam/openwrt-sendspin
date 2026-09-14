@@ -9,8 +9,9 @@ The goal is to turn a router with a USB DAC into a Sendspin player, and to
 submit the package to [openwrt/packages](https://github.com/openwrt/packages)
 once it has proven itself here.
 
-> **Status: experimental, work in progress.** The package builds, but it has
-> not been installed or played through a speaker yet.
+> **Status: experimental.** The package runs on one router, a D-Link
+> DIR-3040, playing from Music Assistant, including in multi-room groups.
+> It has not been tried on other hardware yet.
 
 ## Status
 
@@ -18,8 +19,10 @@ once it has proven itself here.
 |---|---|
 | `sound/sendspin-cli` package (0.1.6) | written |
 | Build with the OpenWrt SDK | verified for `ramips/mt7621` on 25.12.5; other targets through CI |
-| Install and service on a router | not yet |
-| Playback on hardware | not yet |
+| Install and service on a router | verified on the DIR-3040 |
+| Playback from Music Assistant, multi-room | verified on the DIR-3040 |
+| Rediscovery after a service restart | verified |
+| Rediscovery after a router reboot | needs a patched umdns — see [known limitations](#known-limitations) |
 | Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
 
 ## Hardware under test
@@ -29,6 +32,16 @@ once it has proven itself here.
 - **USB audio adapter** — generic "Yichip USB-Audio" (`12d1:3a06`), USB full
   speed, UAC1. It plays **16-bit / 48 kHz stereo only**, so that is the format
   this setup targets.
+
+Measured on this setup while playing from Music Assistant:
+
+| | |
+|---|---|
+| Format negotiated | FLAC, 48 kHz, 16-bit, stereo — no resampling on the router |
+| CPU | 6.3 % of one of the four threads, decoding and software volume included |
+| Memory | 5 MiB resident |
+| Underruns, lost sync | none over 10 minutes and five tracks |
+| Package | 246 KiB; 1.45 MiB of flash with `libopus`, `libstdcpp6` and `umdns` |
 
 Reports from other hardware are welcome; please include the output of
 `cat /proc/asound/card*/stream*`.
@@ -73,8 +86,6 @@ make package/sendspin-cli/compile
 
 ## Configuration
 
-> Not yet verified on a router.
-
 The player is configured in `/etc/config/sendspin-cli` and disabled until
 `enabled` is set. The defaults target the first sound card (`hw:0,0`) and
 offer every format it accepts; `sendspin-cli -l` lists the devices and their
@@ -92,6 +103,19 @@ locally:
 
 ```sh
 sendspin-cli status --control-socket /var/run/sendspin-cli/main.sock
+```
+
+### Routers with more than one network
+
+umdns only announces the player on the networks listed in
+`/etc/config/umdns`, which is `lan` by default. Point it at the network the
+Sendspin server reaches the router through, and make sure that network's
+firewall zone accepts TCP port 8928 (the `port` option) and UDP port 5353:
+
+```sh
+uci set umdns.@umdns[0].network='<network>'
+uci commit umdns
+service umdns reload
 ```
 
 ## Design notes
@@ -122,6 +146,14 @@ sendspin-cli status --control-socket /var/run/sendspin-cli/main.sock
   a few places in the upstream code handle samples in host byte order. Found by
   reading the code, not yet reproduced. Little-endian targets are not affected.
   Tracked in [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
+- **Rediscovery after a router reboot** can fail with the umdns shipped in
+  OpenWrt 25.12, on networks with an mDNS reflector. umdns hears its own
+  probe echoed back, takes its own host name for a conflict and stops
+  announcing, and it does not announce service instances when an interface
+  comes up. Restarting the service (`service sendspin-cli restart`) brings the
+  player back. Fixes are proposed upstream in
+  [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36); details in
+  [#5](https://github.com/mguaylam/openwrt-sendspin/issues/5).
 - **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
   an address; `mdns:` server discovery is not available.
 
