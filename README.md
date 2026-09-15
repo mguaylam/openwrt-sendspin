@@ -23,6 +23,7 @@ once it has proven itself here.
 | Playback from Music Assistant, multi-room | verified on the DIR-3040 |
 | Rediscovery after a service restart | verified |
 | Rediscovery after a router reboot | verified, through a workaround for umdns — see [known limitations](#known-limitations) |
+| USB DAC unplugged and plugged back during playback | verified, through a workaround — see [known limitations](#known-limitations) |
 | Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
 
 ## Hardware under test
@@ -156,6 +157,12 @@ service umdns reload
   Fixes are proposed upstream in
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36); details in
   [#5](https://github.com/mguaylam/openwrt-sendspin/issues/5).
+- **USB DAC unplugged and plugged back.** sendspin-cli 0.1.6 notices the DAC
+  coming back and reopens it, but then stops feeding it, and playback stutters
+  in a loop of underruns until the player is restarted. The package restarts
+  the player when a playback device appears
+  (`/etc/hotplug.d/sound/50-sendspin-cli`). The server ends the stream on that
+  restart, so playback has to be started again.
 - **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
   an address; `mdns:` server discovery is not available.
 
@@ -166,6 +173,10 @@ service umdns reload
   OpenWrt release, and retest rediscovery after a reboot without it.
 - [ ] Follow up on openwrt/mdnsd#36 if it has had no review by 2026-09-28,
   on the pull request or on the openwrt-devel mailing list.
+- [ ] Remove the USB DAC workaround (`files/sendspin-cli.sound-hotplug`) once
+  [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54)
+  is resolved in a sendspin-cli release, and retest unplugging the DAC during
+  playback without it.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
