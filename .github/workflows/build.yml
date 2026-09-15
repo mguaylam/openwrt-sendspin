@@ -99,9 +99,14 @@ jobs:
             .github/scripts/test_entrypoint.sh
           sparse-checkout-cone-mode: false
 
+      # As openwrt/packages does: docker/setup-qemu-action's binfmt image has
+      # no 32-bit MIPS emulation, Ubuntu's qemu-user-static does.
       - name: Register QEMU
         if: matrix.rootfs
-        uses: docker/setup-qemu-action@v4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --import
 
       - name: Runtime test in an OpenWrt container
         if: matrix.rootfs
