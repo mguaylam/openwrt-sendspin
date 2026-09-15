@@ -1,0 +1,71 @@
+name: Upstream release
+
+# Opens an issue when sendspin-cli has a release newer than the packaged one,
+# listing the dependency versions that release pins, since the package
+# downloads each of them with its own hash.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Check for a new sendspin-cli release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare with the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          makefile=sound/sendspin-cli/Makefile
+          packaged=$(sed -n 's/^PKG_VERSION:=//p' "$makefile")
+          latest=$(gh release view -R Sendspin/sendspin-cpp-cli --json tagName --jq .tagName)
+          latest=${latest#v}
+          echo "Packaged $packaged, latest release $latest"
+          [ "$latest" != "$packaged" ] || exit 0
+
+          title="sendspin-cli $latest is available"
+          if gh issue list --state all --search "in:title \"$title\"" --json title --jq '.[].title' |
+            grep -Fx "$title"; then
+            echo "An issue already exists"
+            exit 0
+          fi
+
+          file() { # repo ref path
+            gh api "repos/$1/contents/$3?ref=$2" --jq .content | base64 -d
+          }
+          core=$(file Sendspin/sendspin-cpp-cli "v$latest" CMakeLists.txt |
+            sed -n 's/^set(SENDSPIN_GIT_TAG "\([^"]*\)".*/\1/p')
+          pins=$(file Sendspin/sendspin-cpp "$core" cmake/host.cmake |
+            grep -oE '(GIT_REPOSITORY|GIT_TAG) +[^ ]+' | awk '{print $2}' | paste - - |
+            awk '{printf "| %s | %s |\n", $1, $2}')
+          current=$(grep -E '^(SENDSPIN_CPP|ARDUINOJSON|IXWEBSOCKET|MICRO_FLAC)_VERSION:=' "$makefile" |
+            sed 's/^/    /')
+
+          gh issue create --title "$title" --body "$(cat <<EOF
+          [sendspin-cli $latest](https://github.com/Sendspin/sendspin-cpp-cli/releases/tag/v$latest) is out; the feed packages $packaged.
+
+          It builds against sendspin-cpp \`$core\`, which pins:
+
+          | Repository | Tag |
+          |---|---|
+          $pins
+
+          Currently in \`$makefile\`:
+
+          $current
+
+          To update:
+          - [ ] \`PKG_VERSION\` and \`PKG_HASH\`, \`PKG_RELEASE\` back to 1
+          - [ ] the dependency versions and their \`HASH\` in the \`Download/\` blocks; micro-opus stays replaced by the libopus shim
+          - [ ] check whether the release addresses a workaround listed in the README TODO
+          - [ ] build and test on the DIR-3040
+          EOF
+          )"

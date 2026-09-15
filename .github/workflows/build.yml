@@ -1,7 +1,11 @@
 name: Build
 
 on:
+  # Branches are built through their pull request; building their pushes too
+  # would run the whole matrix twice.
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -51,6 +55,15 @@ jobs:
           - ath79-generic     # mips_24kc: big-endian, soft-float
           - mediatek-filogic  # aarch64_cortex-a53
           - x86-64            # x86_64
+        # The runtime test needs an openwrt/rootfs image whose package feeds
+        # still resolve alsa-lib's kmod-sound-core. Release images do; the
+        # snapshot ones age and point at kernel module feeds that are gone,
+        # and there is no x86_64 image for 25.12.5. That leaves the big-endian
+        # one, run under QEMU.
+        include:
+          - target: ath79-generic
+            release: 25.12.5
+            rootfs: mips_24kc-25.12.5
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +72,7 @@ jobs:
         env:
           ARCH: ${{ matrix.target }}-${{ matrix.release }}
           FEEDNAME: sendspin
+          INDEX: 1
           PACKAGES: ${{ needs.packages.outputs.list }}
 
       - uses: actions/upload-artifact@v7
@@ -67,5 +81,48 @@ jobs:
           name: ${{ matrix.target }}-${{ matrix.release }}
           path: |
             bin/packages/*/sendspin/*.apk
+            bin/packages/*/sendspin/packages.adb
             logs/
           if-no-files-found: warn
+
+      # The same runtime tests openwrt/packages runs on pull requests: install
+      # the package in an OpenWrt root filesystem, check its executables
+      # (version, stripping, linked libraries), then run the package's test.sh.
+      - name: Checkout OpenWrt runtime test scripts
+        if: matrix.rootfs
+        uses: actions/checkout@v7
+        with:
+          repository: openwrt/actions-shared-workflows
+          path: openwrt-tests
+          sparse-checkout: |
+            .github/scripts/ci_helpers.sh
+            .github/scripts/test_entrypoint.sh
+          sparse-checkout-cone-mode: false
+
+      # As openwrt/packages does: docker/setup-qemu-action's binfmt image has
+      # no 32-bit MIPS emulation, Ubuntu's qemu-user-static does.
+      - name: Register QEMU
+        if: matrix.rootfs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --import
+
+      - name: Runtime test in an OpenWrt container
+        if: matrix.rootfs
+        env:
+          ROOTFS: ${{ matrix.rootfs }}
+        run: |
+          mkdir ci
+          cp bin/packages/*/sendspin/*.apk bin/packages/*/sendspin/packages.adb ci/
+          # test_entrypoint.sh finds test.sh from the package origin, e.g. sound/sendspin-cli
+          cp -r sound ci/
+          docker run --rm \
+            --platform "linux/${ROOTFS%-*}" \
+            -e ENABLE_GENERIC_TESTS=true \
+            -e FORCE_GENERIC_TESTS=true \
+            -e PKG_MANAGER=apk \
+            -v "$PWD/openwrt-tests/.github/scripts:/scripts:ro" \
+            -v "$PWD/ci:/ci" \
+            "openwrt/rootfs:$ROOTFS" \
+            /scripts/test_entrypoint.sh
