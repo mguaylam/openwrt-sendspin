@@ -1,7 +1,11 @@
 name: Build
 
 on:
+  # Branches are built through their pull request; building their pushes too
+  # would run the whole matrix twice.
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
