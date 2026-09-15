@@ -177,23 +177,37 @@ service umdns reload
   [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54)
   is resolved in a sendspin-cli release, and retest unplugging the DAC during
   playback without it.
+- [ ] Test cutting the WDS link of the announced network during playback.
+- [ ] Test playback under heavy WiFi load through the router, e.g. `iperf3`,
+  watching CPU, underruns and sync.
+- [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
+  procd logs as `daemon.err` whatever the message's level.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
 ## Continuous integration
 
-Every push builds the feed with gh-action-sdk against OpenWrt 25.12.5 and the
-snapshot SDK:
+Every pull request, and every push to `main`, builds the feed with
+gh-action-sdk against OpenWrt 25.12.5 and the snapshot SDK:
 
-| Target | Package arch | Why |
-|---|---|---|
-| `ramips/mt7621` | `mipsel_24kc` | little-endian, soft-float; the hardware under test |
-| `ath79/generic` | `mips_24kc` | big-endian, soft-float |
-| `mediatek/filogic` | `aarch64_cortex-a53` | 64-bit ARM |
-| `x86/64` | `x86_64` | 64-bit x86 |
+| Target | Package arch | Why | Runtime test |
+|---|---|---|---|
+| `ramips/mt7621` | `mipsel_24kc` | little-endian, soft-float; the hardware under test | — |
+| `ath79/generic` | `mips_24kc` | big-endian, soft-float | 25.12.5, under QEMU |
+| `mediatek/filogic` | `aarch64_cortex-a53` | 64-bit ARM | — |
+| `x86/64` | `x86_64` | 64-bit x86 | — |
 
-A green big-endian build shows the code compiles there, not that it plays
-correctly.
+On `ath79/generic` with 25.12.5, the package is then installed in the
+`openwrt/rootfs` image and tested with the scripts openwrt/packages uses on its pull
+requests: executables, version, stripping and linked libraries, followed by
+`sound/sendspin-cli/test.sh`, which starts the player on the null output. That
+shows the player runs on a big-endian target, not that it plays correctly
+there. The other architectures have no usable image: snapshot images point at
+kernel module feeds that no longer exist, which `alsa-lib` needs, and there is
+no 25.12.5 image for `x86_64`.
+
+A weekly workflow opens an issue when sendspin-cli publishes a newer release,
+with the dependency versions it pins.
 
 ## License
 
