@@ -22,7 +22,7 @@ once it has proven itself here.
 | Install and service on a router | verified on the DIR-3040 |
 | Playback from Music Assistant, multi-room | verified on the DIR-3040 |
 | Rediscovery after a service restart | verified |
-| Rediscovery after a router reboot | verified, through a workaround for umdns — see [known limitations](#known-limitations) |
+| Rediscovery after a router reboot | works through a workaround for umdns, but not every time — see [known limitations](#known-limitations) |
 | USB DAC unplugged and plugged back during playback | verified, through a workaround — see [known limitations](#known-limitations) |
 | Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
 
@@ -154,6 +154,16 @@ service umdns reload
   package works around it with `/etc/hotplug.d/iface/50-sendspin-cli`, which
   restarts the player when a network umdns announces on comes up or changes
   address; a renewed DHCP lease with the same address does not restart it.
+
+  The workaround is a race, and it can lose. On 2026-09-16, on a second
+  DIR-3040 installed from scratch, the hotplug script ran as intended at boot
+  (`Restarting to announce on ido after ifup`, three seconds after the DHCP
+  lease) and the announcement reached another host's umdns cache, yet the
+  server did not discover the player for the 23 minutes it was left alone.
+  Restarting the player by hand and reloading umdns fixed it in five seconds.
+  So expect this to need a hand now and then until the fixes land upstream;
+  how often is not yet measured.
+
   Fixes are proposed upstream in
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36); details in
   [#5](https://github.com/mguaylam/openwrt-sendspin/issues/5).
@@ -177,6 +187,13 @@ service umdns reload
   [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54)
   is resolved in a sendspin-cli release, and retest unplugging the DAC during
   playback without it.
+- [ ] Measure how often rediscovery after a reboot actually fails, over a run
+  of consecutive reboots, rather than from the single failure recorded above.
+- [ ] Depending on that rate, consider making the umdns workaround check its
+  own work: after restarting the player, verify a little later that a server
+  has connected and try again if none has. That would also recover a player
+  procd has given up respawning, which is the state a player left without a
+  sound card ends up in.
 - [ ] Test cutting the WDS link of the announced network during playback.
 - [ ] Test playback under heavy WiFi load through the router, e.g. `iperf3`,
   watching CPU, underruns and sync.
