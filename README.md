@@ -182,6 +182,11 @@ service umdns reload
   watching CPU, underruns and sync.
 - [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
   procd logs as `daemon.err` whatever the message's level.
+- [ ] Follow the changes landing upstream for the next version bump: `-s` no
+  longer takes a literal address, only `-s mdns:<name>`, so the `server`
+  option and its LuCI field have to change; `--audio-format` takes an ordered
+  list of formats, which the validation must accept; and sendspin-cli now
+  builds against sendspin-cpp v0.8.0.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
