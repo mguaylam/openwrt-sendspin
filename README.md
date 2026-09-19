@@ -216,6 +216,19 @@ service umdns reload
   watching CPU, underruns and sync.
 - [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
   procd logs as `daemon.err` whatever the message's level.
+- [ ] Offer the encrypted transport once sendspin-cpp implements it. The
+  Sendspin spec authenticates in the handshake: a client whose first frame is
+  `client/init` runs a Noise exchange against a PSK and gets an encrypted
+  transport, while a first frame of `client/hello` is the legacy clear-text
+  path, which a server accepts only while it runs in transition mode.
+  sendspin-cpp v0.8.0 sends `client/hello` and carries no Noise or PSK code at
+  all; its own roadmap records having no inbound authentication of any kind
+  and names a host firewall as the mitigation meanwhile, which is what the
+  firewall zone in [routers with more than one
+  network](#routers-with-more-than-one-network) already provides. This will
+  not arrive with a version bump alone: the server admits a client by PSK, so
+  the package will need a pairing or PSK option of its own, here and in the
+  LuCI app.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
