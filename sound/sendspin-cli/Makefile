@@ -3,12 +3,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sendspin-cli
-PKG_VERSION:=0.1.6
-PKG_RELEASE:=4
+PKG_VERSION:=0.3.0
+PKG_RELEASE:=1
 
 PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=c7f4110a9465843db910c95a628a0f777b7e1b79fe1281866755dddf370318a9
+PKG_HASH:=baa9febbc08d58e1780d6a62fb0b20d458cd1a3cbb177929ba5f4ff0b01d335c
 PKG_BUILD_DIR:=$(BUILD_DIR)/sendspin-cpp-cli-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Michaël Guay-Lambert <michaelguaylambert@me.com>
@@ -19,7 +19,7 @@ PKG_BUILD_FLAGS:=no-mips16
 
 # The versions sendspin-cli v$(PKG_VERSION) pins through FetchContent
 # (SENDSPIN_GIT_TAG, then sendspin-cpp's cmake/host.cmake).
-SENDSPIN_CPP_VERSION:=0.7.2
+SENDSPIN_CPP_VERSION:=0.8.0
 ARDUINOJSON_VERSION:=7.4.1
 IXWEBSOCKET_VERSION:=11.4.5
 MICRO_FLAC_VERSION:=0.1.1
@@ -49,7 +49,7 @@ endef
 define Download/sendspin-cpp
   URL:=https://codeload.github.com/Sendspin/sendspin-cpp/tar.gz/v$(SENDSPIN_CPP_VERSION)?
   FILE:=sendspin-cpp-$(SENDSPIN_CPP_VERSION).tar.gz
-  HASH:=2f8ecb919ab58c195c3a5fbfc097f59b2d502a1716979bcb1a0b7a5f2ccccf8d
+  HASH:=cfd485ca5ecaff2406af382f309ce7d0c8709d56ac6c0a3a7420f8d423978a02
 endef
 $(eval $(call Download,sendspin-cpp))
 
