@@ -173,20 +173,37 @@ service umdns reload
   the player when a playback device appears
   (`/etc/hotplug.d/sound/50-sendspin-cli`). The server ends the stream on that
   restart, so playback has to be started again.
+
+  Both halves of this are fixed upstream, in releases this feed does not
+  package yet: 0.2.0 stopped the playback clock jumping over the outage
+  ([#55](https://github.com/Sendspin/sendspin-cpp-cli/pull/55)), and 0.3.0
+  made a second outage in the same stream recoverable
+  ([#67](https://github.com/Sendspin/sendspin-cpp-cli/pull/67)), which until
+  then left the sink silent with nothing in the log to say why
+  ([#65](https://github.com/Sendspin/sendspin-cpp-cli/issues/65), found here).
+  Both were tested on the DIR-3040 before they merged, the first one twice.
 - **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
   an address; `mdns:` server discovery is not available.
 
 ## TODO
 
+- [ ] Bump to sendspin-cli 0.3.0. Only `sendspin-cpp` moves with it, to
+  v0.8.0; ArduinoJson, IXWebSocket and micro-flac keep the pins already in the
+  Makefile, and micro-opus stays replaced by the libopus shim. `--audio-format`
+  now takes a comma-separated ordered list of preferred formats, so the
+  option's validation here and in the LuCI app has to accept one. The `-s`
+  address form that 0.2.0 removed came back in 0.3.0, so the `server` option
+  is unaffected after all.
 - [ ] Remove the umdns workaround (`files/sendspin-cli.hotplug`) once
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36) ships in an
   OpenWrt release, and retest rediscovery after a reboot without it.
 - [ ] Follow up on openwrt/mdnsd#36 if it has had no review by 2026-09-28,
   on the pull request or on the openwrt-devel mailing list.
-- [ ] Remove the USB DAC workaround (`files/sendspin-cli.sound-hotplug`) once
-  [Sendspin/sendspin-cpp-cli#54](https://github.com/Sendspin/sendspin-cpp-cli/issues/54)
-  is resolved in a sendspin-cli release, and retest unplugging the DAC during
-  playback without it.
+- [ ] Remove the USB DAC workaround (`files/sendspin-cli.sound-hotplug`) after
+  the bump above, since 0.3.0 carries the fixes for both halves of it. Retest
+  without the workaround first, and unplug **twice** in the same track: one
+  replug recovered even before 0.3.0, and it was the second one that used to
+  leave the sink silent for good.
 - [ ] Measure how often rediscovery after a reboot actually fails, over a run
   of consecutive reboots, rather than from the single failure recorded above.
 - [ ] Depending on that rate, consider making the umdns workaround check its
@@ -199,11 +216,6 @@ service umdns reload
   watching CPU, underruns and sync.
 - [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
   procd logs as `daemon.err` whatever the message's level.
-- [ ] Follow the changes landing upstream for the next version bump: `-s` no
-  longer takes a literal address, only `-s mdns:<name>`, so the `server`
-  option and its LuCI field have to change; `--audio-format` takes an ordered
-  list of formats, which the validation must accept; and sendspin-cli now
-  builds against sendspin-cpp v0.8.0.
 - [ ] Fix playback on big-endian targets
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
