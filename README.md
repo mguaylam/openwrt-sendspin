@@ -187,6 +187,12 @@ service umdns reload
 - **Client-initiated discovery**: with mDNS handled by umdns, `server` must be
   an address; `mdns:` server discovery is not available.
 
+## Roadmap
+
+[ROADMAP.md](ROADMAP.md) tracks how far this package reaches across OpenWrt's
+targets, what stops it reaching further, and which upstream change lifts each
+limit. The list below is the tactical work; that page is the coverage story.
+
 ## TODO
 
 - [ ] Bump to sendspin-cli 0.3.0. Only `sendspin-cpp` moves with it, to
