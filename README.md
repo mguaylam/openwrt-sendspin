@@ -24,7 +24,7 @@ once it has proven itself here.
 | Rediscovery after a service restart | verified |
 | Rediscovery after a router reboot | works through a workaround for umdns, but not every time — see [known limitations](#known-limitations) |
 | USB DAC unplugged and plugged back during playback | verified on 0.3.0, twice in one track, with no workaround |
-| Big-endian targets (e.g. ath79) | builds; playback expected to be wrong — see [known limitations](#known-limitations) |
+| Big-endian targets (e.g. ath79) | not offered: playback is wrong, reproduced — see [known limitations](#known-limitations) |
 
 ## Hardware under test
 
@@ -142,11 +142,28 @@ service umdns reload
 
 ## Known limitations
 
-- **Big-endian targets** (e.g. `ath79`, `mips_24kc`): the package builds, but
-  Opus, 16-bit FLAC and software volume are expected to play as noise, because
-  a few places in the upstream code handle samples in host byte order. Found by
-  reading the code, not yet reproduced. Little-endian targets are not affected.
-  Tracked in [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
+- **Big-endian targets** (e.g. `ath79`, `mips_24kc`): **the package is not
+  offered there.** It carries `@!BIG_ENDIAN`, so it is not selectable on those
+  targets, because playback would be wrong rather than merely imperfect.
+
+  This is no longer a reading of the code. `src/pcm_volume.cpp` documents its
+  own contract as "signed little-endian PCM", and its 24-bit path honours that
+  byte by byte, but its 16- and 32-bit paths cast the buffer to native
+  `int16_t`/`int32_t`. Compiling that file unchanged for MIPS big-endian and
+  running it under `qemu-mips-static`, against a little-endian sine at -6 dB:
+
+  | Format | x86_64 | MIPS big-endian |
+  |---|---|---|
+  | 16-bit `S16_LE` | correct | **57 of 64 samples wrong** |
+  | 24-bit `S24_3LE` | correct | correct |
+  | 32-bit `S32_LE` | correct | **60 of 64 samples wrong** |
+
+  Software volume is one of three places. The other two are read-confirmed but
+  not reproduced: `opus_decode()` fills the output with native `int16_t` in
+  sendspin-cpp `src/decoder.cpp`, still so in v0.8.0, and micro-flac's
+  `pcm_packing.cpp` packs samples in host order. Little-endian targets are not
+  affected. Tracked in
+  [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
   service instances when a network comes up, and on networks with an mDNS
   reflector it takes its own reflected probe for a name conflict and stops
@@ -209,7 +226,10 @@ service umdns reload
   not arrive with a version bump alone: the server admits a client by PSK, so
   the package will need a pairing or PSK option of its own, here and in the
   LuCI app.
-- [ ] Fix playback on big-endian targets
+- [ ] Report the byte-order defects upstream, with the qemu-mips reproducer:
+  software volume in sendspin-cli, `opus_decode()` in sendspin-cpp, and
+  micro-flac's sample packing. Drop `@!BIG_ENDIAN` and restore the ath79
+  runtime test once they are fixed
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
 
 ## Continuous integration
@@ -217,21 +237,21 @@ service umdns reload
 Every pull request, and every push to `main`, builds the feed with
 gh-action-sdk against OpenWrt 25.12.5 and the snapshot SDK:
 
-| Target | Package arch | Why | Runtime test |
-|---|---|---|---|
-| `ramips/mt7621` | `mipsel_24kc` | little-endian, soft-float; the hardware under test | — |
-| `ath79/generic` | `mips_24kc` | big-endian, soft-float | 25.12.5, under QEMU |
-| `mediatek/filogic` | `aarch64_cortex-a53` | 64-bit ARM | — |
-| `x86/64` | `x86_64` | 64-bit x86 | — |
+| Target | Package arch | Why |
+|---|---|---|
+| `ramips/mt7621` | `mipsel_24kc` | little-endian, soft-float; the hardware under test |
+| `ath79/generic` | `mips_24kc` | big-endian: checks the package stays excluded there |
+| `mediatek/filogic` | `aarch64_cortex-a53` | 64-bit ARM |
+| `x86/64` | `x86_64` | 64-bit x86 |
 
-On `ath79/generic` with 25.12.5, the package is then installed in the
-`openwrt/rootfs` image and tested with the scripts openwrt/packages uses on its pull
-requests: executables, version, stripping and linked libraries, followed by
-`sound/sendspin-cli/test.sh`, which starts the player on the null output. That
-shows the player runs on a big-endian target, not that it plays correctly
-there. The other architectures have no usable image: snapshot images point at
-kernel module feeds that no longer exist, which `alsa-lib` needs, and there is
-no 25.12.5 image for `x86_64`.
+There is no runtime test at the moment. It used to install the package in an
+`openwrt/rootfs` image on `ath79/generic` and run the scripts openwrt/packages
+uses on its pull requests, but that image is `mips_24kc` — big-endian, where
+the package is no longer built. The other architectures have no usable image:
+snapshot images point at kernel module feeds that no longer exist, which
+`alsa-lib` needs, and there is no 25.12.5 image for `x86_64`. It comes back
+when a little-endian image is published, or when the byte-order defects are
+fixed upstream and `@!BIG_ENDIAN` comes off.
 
 A weekly workflow opens an issue when sendspin-cli publishes a newer release,
 with the dependency versions it pins.

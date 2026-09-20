@@ -52,18 +52,15 @@ jobs:
           - main
         target:
           - ramips-mt7621     # mipsel_24kc: little-endian, soft-float (test hardware)
-          - ath79-generic     # mips_24kc: big-endian, soft-float
+          - ath79-generic     # mips_24kc: big-endian, where the package is not offered
           - mediatek-filogic  # aarch64_cortex-a53
           - x86-64            # x86_64
-        # The runtime test needs an openwrt/rootfs image whose package feeds
-        # still resolve alsa-lib's kmod-sound-core. Release images do; the
-        # snapshot ones age and point at kernel module feeds that are gone,
-        # and there is no x86_64 image for 25.12.5. That leaves the big-endian
-        # one, run under QEMU.
-        include:
-          - target: ath79-generic
-            release: 25.12.5
-            rootfs: mips_24kc-25.12.5
+        # No runtime test for now. It needs an openwrt/rootfs image whose feeds
+        # still resolve alsa-lib's kmod-sound-core, and the only one that does
+        # is mips_24kc -- big-endian, where the package no longer builds since
+        # it gained its @!BIG_ENDIAN dependency. Restore it against a
+        # little-endian rootfs when one is published, or once the byte-order
+        # defects are fixed upstream and the guard comes off.
     steps:
       - uses: actions/checkout@v7
 
