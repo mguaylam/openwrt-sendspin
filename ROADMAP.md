@@ -57,15 +57,21 @@ of otherwise supported hardware:
 ### 1. Byte order — blocks every big-endian target
 
 Audio samples are written in host byte order in three places and consumed as
-little-endian PCM. Two are reproduced under `qemu-mips-static`, one is
-read-confirmed. Until they are fixed, the package carries `@!BIG_ENDIAN` and
-is simply not offered rather than offered and wrong.
+little-endian PCM. **All three are reproduced** under `qemu-mips-static`.
+Until they are fixed, the package carries `@!BIG_ENDIAN` and is simply not
+offered rather than offered and wrong.
 
 | Upstream | What | Evidence |
 |---|---|---|
 | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 |
 | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address |
-| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | read-confirmed, not reproduced |
+| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 |
+
+Each was demonstrated by building the file or library unchanged for MIPS
+big-endian and running it under `qemu-mips-static`, with the same harness on
+x86_64 as the control. The pattern is the same in all three: the careful path
+writes bytes one at a time and is correct anywhere, the convenient path casts
+the buffer at native width.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
