@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sendspin-cli
 PKG_VERSION:=0.3.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
@@ -32,7 +32,10 @@ define Package/sendspin-cli
   CATEGORY:=Sound
   TITLE:=Sendspin synchronized audio player
   URL:=https://github.com/Sendspin/sendspin-cpp-cli
-  DEPENDS:=+alsa-lib +libatomic +libopus +libstdcpp +umdns
+  # Not offered on big-endian: software volume and the Opus decoder write
+  # samples in host byte order into buffers the ALSA sink opens as _LE.
+  # Reproduced under qemu-mips, see the README. Drop once fixed upstream.
+  DEPENDS:=+alsa-lib +libatomic +libopus +libstdcpp +umdns @!BIG_ENDIAN
   USERID:=sendspin:audio=29
 endef
 
