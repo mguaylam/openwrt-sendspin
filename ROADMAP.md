@@ -128,10 +128,27 @@ own, here and in the LuCI app.
 
 ## Submission to openwrt/packages
 
-Not yet, and blocker 1 is why: submitting a package that plays noise on
-`ath79` would be wrong, and `@!BIG_ENDIAN` is a holding position rather than
-an answer. The mechanical requirements are met — maintainer, SPDX licence,
-procd init, `conffiles`, no patches, no out-of-tree dependencies — and are
-checked against the repository's own
+Planned, with `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to
+lift. Upstream has confirmed that defect and has no fix, so waiting would mean
+withholding a package that is correct on every little-endian target — which is
+most of OpenWrt and all of its recent hardware — for the sake of six targets
+it would be wrong on. Declining to build there is the honest way to say that,
+and the guard comes off in one line when the fixes land.
+
+The mechanical requirements are met — maintainer, SPDX licence, procd init,
+`conffiles`, no patches, no out-of-tree dependencies — and were checked
+against the repository's own
 [review rules](https://github.com/openwrt/packages/blob/master/.github/llm-review-rules.md).
-Submission also waits on a soak period on real hardware.
+Two points that looked like findings and are not:
+
+- **`test-version.sh` is not needed.** The generic check runs the binary with
+  `--version` and expects `PKG_VERSION` in the output; `sendspin-cli
+  --version` prints `sendspin-cli 0.3.0`.
+- **`codeload.github.com` is correct here, not a missing `@GITHUB`.** That
+  macro resolves to `https://raw.githubusercontent.com` in
+  `scripts/projectsmirrors.json`, which serves individual files and cannot
+  serve a release tarball.
+
+What is still owed is time on hardware: rediscovery after a reboot is a known
+race (blocker 2), and how often it actually loses is measured in the
+[README](README.md)'s TODO, not yet answered.
