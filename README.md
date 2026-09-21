@@ -206,13 +206,6 @@ limit. The list below is the tactical work; that page is the coverage story.
 
 ## TODO
 
-- [ ] Bump to sendspin-cli 0.3.0. Only `sendspin-cpp` moves with it, to
-  v0.8.0; ArduinoJson, IXWebSocket and micro-flac keep the pins already in the
-  Makefile, and micro-opus stays replaced by the libopus shim. `--audio-format`
-  now takes a comma-separated ordered list of preferred formats, so the
-  option's validation here and in the LuCI app has to accept one. The `-s`
-  address form that 0.2.0 removed came back in 0.3.0, so the `server` option
-  is unaffected after all.
 - [ ] Remove the umdns workaround (`files/sendspin-cli.hotplug`) once
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36) ships in an
   OpenWrt release, and retest rediscovery after a reboot without it.
@@ -243,11 +236,13 @@ limit. The list below is the tactical work; that page is the coverage story.
   not arrive with a version bump alone: the server admits a client by PSK, so
   the package will need a pairing or PSK option of its own, here and in the
   LuCI app.
-- [ ] Report the byte-order defects upstream, with the qemu-mips reproducer:
-  software volume in sendspin-cli, `opus_decode()` in sendspin-cpp, and
-  micro-flac's sample packing. Drop `@!BIG_ENDIAN` and restore the ath79
-  runtime test once they are fixed
-  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
+- [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test once the three
+  byte-order defects are fixed upstream
+  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three are
+  reported with the qemu-mips reproducer; none has a fix yet.
+- [ ] Offer the qemu-mips harness to sendspin-cpp-cli as a regression test.
+  Upstream has none, and says its existing 16- and 32-bit tests cannot catch
+  this because they use native-endian arrays.
 
 ## Continuous integration
 
