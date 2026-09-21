@@ -73,6 +73,12 @@ x86_64 as the control. The pattern is the same in all three: the careful path
 writes bytes one at a time and is correct anywhere, the convenient path casts
 the buffer at native width.
 
+Upstream confirmed the diagnosis on sendspin-cpp-cli#70 on 2026-09-21 and has
+no fix: its unpublished draft still carries the native-endian accesses, it has
+no reproduction of its own, and it notes that its existing 16- and 32-bit
+tests use native-endian arrays and therefore cannot establish the contract on
+a big-endian host. So this blocker should be expected to hold for a while.
+
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
 **When all three land:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
