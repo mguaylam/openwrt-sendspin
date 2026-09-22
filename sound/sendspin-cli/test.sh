@@ -8,6 +8,10 @@
 [ "$1" = sendspin-cli ] || exit 0
 
 state=$(mktemp -d)
+pid=""
+cleanup() { [ -n "$pid" ] && kill "$pid" 2>/dev/null; rm -rf "$state"; }
+trap cleanup EXIT
+
 sendspin-cli --output null --name ci --no-mdns --no-control --state-dir "$state" > "$state/log" 2>&1 &
 pid=$!
 
