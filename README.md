@@ -158,11 +158,22 @@ service umdns reload
   | 24-bit `S24_3LE` | correct | correct |
   | 32-bit `S32_LE` | correct | **60 of 64 samples wrong** |
 
-  Software volume is one of three places. The other two are read-confirmed but
-  not reproduced: `opus_decode()` fills the output with native `int16_t` in
-  sendspin-cpp `src/decoder.cpp`, still so in v0.8.0, and micro-flac's
-  `pcm_packing.cpp` packs samples in host order. Little-endian targets are not
-  affected. Tracked in
+  Software volume is one of three places, and all three are now reproduced the
+  same way: built unchanged for MIPS big-endian, run under `qemu-mips-static`,
+  with the same harness on x86_64 as the control.
+
+  | Where | Upstream | Result on MIPS big-endian |
+  |---|---|---|
+  | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | 57/64 and 60/64 samples wrong |
+  | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | wrong on the aligned fast paths only |
+  | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | decoder writes -45, a little-endian reader gets -11265 |
+
+  The pattern is the same in all three: the careful path writes bytes one at a
+  time and is correct anywhere, the convenient path casts the buffer at native
+  width. Upstream has confirmed the diagnosis on the first and has no fix yet,
+  noting that its own 16- and 32-bit tests use native-endian arrays and so
+  cannot establish the contract on a big-endian host. Little-endian targets
+  are not affected. Tracked in
   [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
   service instances when a network comes up, and on networks with an mDNS
@@ -195,13 +206,6 @@ limit. The list below is the tactical work; that page is the coverage story.
 
 ## TODO
 
-- [ ] Bump to sendspin-cli 0.3.0. Only `sendspin-cpp` moves with it, to
-  v0.8.0; ArduinoJson, IXWebSocket and micro-flac keep the pins already in the
-  Makefile, and micro-opus stays replaced by the libopus shim. `--audio-format`
-  now takes a comma-separated ordered list of preferred formats, so the
-  option's validation here and in the LuCI app has to accept one. The `-s`
-  address form that 0.2.0 removed came back in 0.3.0, so the `server` option
-  is unaffected after all.
 - [ ] Remove the umdns workaround (`files/sendspin-cli.hotplug`) once
   [openwrt/mdnsd#36](https://github.com/openwrt/mdnsd/pull/36) ships in an
   OpenWrt release, and retest rediscovery after a reboot without it.
@@ -232,11 +236,13 @@ limit. The list below is the tactical work; that page is the coverage story.
   not arrive with a version bump alone: the server admits a client by PSK, so
   the package will need a pairing or PSK option of its own, here and in the
   LuCI app.
-- [ ] Report the byte-order defects upstream, with the qemu-mips reproducer:
-  software volume in sendspin-cli, `opus_decode()` in sendspin-cpp, and
-  micro-flac's sample packing. Drop `@!BIG_ENDIAN` and restore the ath79
-  runtime test once they are fixed
-  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)).
+- [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test once the three
+  byte-order defects are fixed upstream
+  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three are
+  reported with the qemu-mips reproducer; none has a fix yet.
+- [ ] Offer the qemu-mips harness to sendspin-cpp-cli as a regression test.
+  Upstream has none, and says its existing 16- and 32-bit tests cannot catch
+  this because they use native-endian arrays.
 
 ## Continuous integration
 

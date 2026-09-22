@@ -73,6 +73,12 @@ x86_64 as the control. The pattern is the same in all three: the careful path
 writes bytes one at a time and is correct anywhere, the convenient path casts
 the buffer at native width.
 
+Upstream confirmed the diagnosis on sendspin-cpp-cli#70 on 2026-09-21 and has
+no fix: its unpublished draft still carries the native-endian accesses, it has
+no reproduction of its own, and it notes that its existing 16- and 32-bit
+tests use native-endian arrays and therefore cannot establish the contract on
+a big-endian host. So this blocker should be expected to hold for a while.
+
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
 **When all three land:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
@@ -122,10 +128,27 @@ own, here and in the LuCI app.
 
 ## Submission to openwrt/packages
 
-Not yet, and blocker 1 is why: submitting a package that plays noise on
-`ath79` would be wrong, and `@!BIG_ENDIAN` is a holding position rather than
-an answer. The mechanical requirements are met — maintainer, SPDX licence,
-procd init, `conffiles`, no patches, no out-of-tree dependencies — and are
-checked against the repository's own
+Planned, with `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to
+lift. Upstream has confirmed that defect and has no fix, so waiting would mean
+withholding a package that is correct on every little-endian target — which is
+most of OpenWrt and all of its recent hardware — for the sake of six targets
+it would be wrong on. Declining to build there is the honest way to say that,
+and the guard comes off in one line when the fixes land.
+
+The mechanical requirements are met — maintainer, SPDX licence, procd init,
+`conffiles`, no patches, no out-of-tree dependencies — and were checked
+against the repository's own
 [review rules](https://github.com/openwrt/packages/blob/master/.github/llm-review-rules.md).
-Submission also waits on a soak period on real hardware.
+Two points that looked like findings and are not:
+
+- **`test-version.sh` is not needed.** The generic check runs the binary with
+  `--version` and expects `PKG_VERSION` in the output; `sendspin-cli
+  --version` prints `sendspin-cli 0.3.0`.
+- **`codeload.github.com` is correct here, not a missing `@GITHUB`.** That
+  macro resolves to `https://raw.githubusercontent.com` in
+  `scripts/projectsmirrors.json`, which serves individual files and cannot
+  serve a release tarball.
+
+What is still owed is time on hardware: rediscovery after a reboot is a known
+race (blocker 2), and how often it actually loses is measured in the
+[README](README.md)'s TODO, not yet answered.
