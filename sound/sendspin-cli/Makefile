@@ -13,7 +13,12 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/sendspin-cpp-cli-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Michaël Guay-Lambert <michaelguaylambert@me.com>
 PKG_LICENSE:=Apache-2.0 BSD-3-Clause MIT
-PKG_LICENSE_FILES:=LICENSE
+# The bundled dependencies land under openwrt-deps/ in Build/Prepare below.
+PKG_LICENSE_FILES:=LICENSE \
+	openwrt-deps/sendspin-cpp/LICENSE \
+	openwrt-deps/ArduinoJson/LICENSE.txt \
+	openwrt-deps/IXWebSocket/LICENSE.txt \
+	openwrt-deps/micro-flac/LICENSE
 
 PKG_BUILD_FLAGS:=no-mips16
 
