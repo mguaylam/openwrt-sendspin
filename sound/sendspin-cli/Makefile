@@ -11,7 +11,7 @@ PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(
 PKG_HASH:=baa9febbc08d58e1780d6a62fb0b20d458cd1a3cbb177929ba5f4ff0b01d335c
 PKG_BUILD_DIR:=$(BUILD_DIR)/sendspin-cpp-cli-$(PKG_VERSION)
 
-PKG_MAINTAINER:=Michaël Guay-Lambert <michaelguaylambert@me.com>
+PKG_MAINTAINER:=Michaël Guay-Lambert <mguaylam.dev@gmail.com>
 PKG_LICENSE:=Apache-2.0 BSD-3-Clause MIT
 # The bundled dependencies land under openwrt-deps/ in Build/Prepare below.
 PKG_LICENSE_FILES:=LICENSE \
