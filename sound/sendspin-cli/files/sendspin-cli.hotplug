@@ -15,6 +15,10 @@ esac
 for network in $(uci -q get umdns.@umdns[-1].network); do
 	[ "$network" = "$INTERFACE" ] || continue
 	/etc/init.d/sendspin-cli running || exit 0
+	# Only a player announced over mDNS has anything to refresh; one
+	# connecting out to a server would just lose its stream.
+	ubus call service list '{"name":"sendspin-cli"}' 2> /dev/null |
+		jsonfilter -e '@["sendspin-cli"].instances[*].data.mdns' > /dev/null 2>&1 || exit 0
 	logger -t sendspin-cli "Restarting to announce on $INTERFACE after $ACTION"
 	/etc/init.d/sendspin-cli restart > /dev/null 2>&1 &
 	exit 0
