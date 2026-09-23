@@ -55,12 +55,16 @@ jobs:
           - ath79-generic     # mips_24kc: big-endian, where the package is not offered
           - mediatek-filogic  # aarch64_cortex-a53
           - x86-64            # x86_64
-        # No runtime test for now. It needs an openwrt/rootfs image whose feeds
-        # still resolve alsa-lib's kmod-sound-core, and the only one that does
-        # is mips_24kc -- big-endian, where the package no longer builds since
-        # it gained its @!BIG_ENDIAN dependency. Restore it against a
-        # little-endian rootfs when one is published, or once the byte-order
-        # defects are fixed upstream and the guard comes off.
+        # The runtime test needs an openwrt/rootfs image whose feeds resolve
+        # alsa-lib's kmod-sound-core. x86_64 has one for both releases, and it
+        # is one of the images openwrt/packages runs its own test on.
+        include:
+          - target: x86-64
+            release: 25.12.5
+            rootfs: x86_64-25.12.5
+          - target: x86-64
+            release: main
+            rootfs: x86_64-master
     steps:
       - uses: actions/checkout@v7
 
@@ -94,6 +98,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/ci_helpers.sh
             .github/scripts/test_entrypoint.sh
+            .github/scripts/sysctl.init
           sparse-checkout-cone-mode: false
 
       # As openwrt/packages does: docker/setup-qemu-action's binfmt image has
@@ -120,6 +125,7 @@ jobs:
             -e FORCE_GENERIC_TESTS=true \
             -e PKG_MANAGER=apk \
             -v "$PWD/openwrt-tests/.github/scripts:/scripts:ro" \
+            -v "$PWD/openwrt-tests/.github/scripts/sysctl.init:/etc/init.d/sysctl:ro" \
             -v "$PWD/ci:/ci" \
             "openwrt/rootfs:$ROOTFS" \
             /scripts/test_entrypoint.sh

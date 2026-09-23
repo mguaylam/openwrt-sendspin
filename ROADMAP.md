@@ -101,13 +101,11 @@ Tracked here as [#5](https://github.com/mguaylam/openwrt-sendspin/issues/5).
 **When it lands in an OpenWrt release:** delete
 `files/sendspin-cli.hotplug`, retest rediscovery after a reboot without it.
 
-### 3. No runtime test — affects confidence, not coverage
+### 3. Runtime test on big-endian — affects confidence, not coverage
 
-The runtime test ran on `ath79/generic` because `mips_24kc` is the only
-`openwrt/rootfs` image whose feeds still resolve `alsa-lib`'s
-`kmod-sound-core`. That image is big-endian, where the package no longer
-builds. It returns when a little-endian image is published, or with
-blocker 1.
+CI runs the package in an `x86_64` `openwrt/rootfs` image, as openwrt/packages
+does. It used to run on `ath79/generic` as well, which is big-endian and where
+the package is no longer built. That test returns with blocker 1.
 
 ### 4. Hardware volume — a quality limit, not a coverage one
 
