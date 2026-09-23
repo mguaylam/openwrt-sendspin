@@ -37,9 +37,11 @@ define Package/sendspin-cli
   CATEGORY:=Sound
   TITLE:=Sendspin synchronized audio player
   URL:=https://github.com/Sendspin/sendspin-cpp-cli
-  # Not offered on big-endian: software volume and the Opus decoder write
-  # samples in host byte order into buffers the ALSA sink opens as _LE.
-  # Reproduced under qemu-mips, see the README. Drop once fixed upstream.
+  # Not offered on big-endian: software volume, the Opus decoder and
+  # micro-flac's sample packing write samples in host byte order into buffers
+  # the ALSA sink opens as _LE. Reproduced under qemu-mips and reported as
+  # Sendspin/sendspin-cpp-cli#70, Sendspin/sendspin-cpp#132 and
+  # esphome-libs/micro-flac#36. Drop once they are fixed.
   DEPENDS:=+alsa-lib +libatomic +libopus +libstdcpp +umdns @!BIG_ENDIAN
   USERID:=sendspin:audio=29
 endef
