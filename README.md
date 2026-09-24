@@ -256,14 +256,12 @@ gh-action-sdk against OpenWrt 25.12.5 and the snapshot SDK:
 | `mediatek/filogic` | `aarch64_cortex-a53` | 64-bit ARM |
 | `x86/64` | `x86_64` | 64-bit x86 |
 
-There is no runtime test at the moment. It used to install the package in an
-`openwrt/rootfs` image on `ath79/generic` and run the scripts openwrt/packages
-uses on its pull requests, but that image is `mips_24kc` — big-endian, where
-the package is no longer built. The other architectures have no usable image:
-snapshot images point at kernel module feeds that no longer exist, which
-`alsa-lib` needs, and there is no 25.12.5 image for `x86_64`. It comes back
-when a little-endian image is published, or when the byte-order defects are
-fixed upstream and `@!BIG_ENDIAN` comes off.
+On `x86/64`, it then installs the package in an `openwrt/rootfs` image and
+runs the scripts openwrt/packages uses on its pull requests: the generic
+checks (version, stripping, linked libraries), then `sound/sendspin-cli/test.sh`,
+which starts the player on the null output and waits for it to listen. The
+other architectures have no runtime test: `ath79` because the package is not
+built there, the rest because openwrt/packages does not test them either.
 
 A weekly workflow opens an issue when sendspin-cli publishes a newer release,
 with the dependency versions it pins.
