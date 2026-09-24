@@ -5,9 +5,10 @@ the headless player for [Sendspin](https://github.com/Sendspin/spec), the
 synchronized multi-room audio protocol from the Open Home Foundation used by
 Music Assistant.
 
-The goal is to turn a router with a USB DAC into a Sendspin player, and to
-submit the package to [openwrt/packages](https://github.com/openwrt/packages)
-once it has proven itself here.
+The goal is to turn a router with a USB DAC into a Sendspin player. The
+package is submitted to openwrt/packages as
+[openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577); this
+feed is where it is developed and tested until it lands there.
 
 > **Status: experimental.** The package runs on one router, a D-Link
 > DIR-3040, playing from Music Assistant, including in multi-room groups.
@@ -17,7 +18,7 @@ once it has proven itself here.
 
 | | |
 |---|---|
-| `sound/sendspin-cli` package (0.1.6) | written |
+| `sound/sendspin-cli` package (0.3.0) | written |
 | Build with the OpenWrt SDK | verified for `ramips/mt7621` on 25.12.5; other targets through CI |
 | Install and service on a router | verified on the DIR-3040 |
 | Playback from Music Assistant, multi-room | verified on the DIR-3040 |
@@ -41,7 +42,7 @@ Measured on this setup while playing from Music Assistant:
 | Format negotiated | FLAC, 48 kHz, 16-bit, stereo — no resampling on the router |
 | CPU | 6.3 % of one of the four threads, decoding and software volume included |
 | Memory | 5 MiB resident |
-| Underruns, lost sync | none over 10 minutes and five tracks |
+| Underruns | none over 49 hours of continuous playback |
 | Package | 246 KiB; 1.45 MiB of flash with `libopus`, `libstdcpp6` and `umdns` |
 
 Reports from other hardware are welcome; please include the output of
@@ -146,21 +147,10 @@ service umdns reload
   offered there.** It carries `@!BIG_ENDIAN`, so it is not selectable on those
   targets, because playback would be wrong rather than merely imperfect.
 
-  This is no longer a reading of the code. `src/pcm_volume.cpp` documents its
-  own contract as "signed little-endian PCM", and its 24-bit path honours that
-  byte by byte, but its 16- and 32-bit paths cast the buffer to native
-  `int16_t`/`int32_t`. Compiling that file unchanged for MIPS big-endian and
-  running it under `qemu-mips-static`, against a little-endian sine at -6 dB:
-
-  | Format | x86_64 | MIPS big-endian |
-  |---|---|---|
-  | 16-bit `S16_LE` | correct | **57 of 64 samples wrong** |
-  | 24-bit `S24_3LE` | correct | correct |
-  | 32-bit `S32_LE` | correct | **60 of 64 samples wrong** |
-
-  Software volume is one of three places, and all three are now reproduced the
-  same way: built unchanged for MIPS big-endian, run under `qemu-mips-static`,
-  with the same harness on x86_64 as the control.
+  Three places write samples in host byte order into buffers the ALSA sink
+  opens as little-endian. All three are reproduced: built unchanged for MIPS
+  big-endian, run under `qemu-mips-static`, with the same harness on x86_64 as
+  the control.
 
   | Where | Upstream | Result on MIPS big-endian |
   |---|---|---|

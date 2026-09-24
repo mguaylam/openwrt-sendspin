@@ -126,12 +126,14 @@ own, here and in the LuCI app.
 
 ## Submission to openwrt/packages
 
-Planned, with `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to
-lift. Upstream has confirmed that defect and has no fix, so waiting would mean
-withholding a package that is correct on every little-endian target — which is
-most of OpenWrt and all of its recent hardware — for the sake of six targets
-it would be wrong on. Declining to build there is the honest way to say that,
-and the guard comes off in one line when the fixes land.
+Submitted as
+[openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
+`@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. Upstream
+has confirmed that defect and has no fix, so waiting would mean withholding a
+package that is correct on every little-endian target — which is most of
+OpenWrt and all of its recent hardware — for the sake of six targets it would
+be wrong on. Declining to build there is the honest way to say that, and the
+guard comes off in one line when the fixes land.
 
 The mechanical requirements are met — maintainer, SPDX licence, procd init,
 `conffiles`, no patches, no out-of-tree dependencies — and were checked
