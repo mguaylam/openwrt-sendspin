@@ -124,6 +124,22 @@ a host firewall meanwhile. Servers accept this only while they run in
 transition mode. When that ends, the package needs a pairing option of its
 own, here and in the LuCI app.
 
+| Upstream | What | Status |
+|---|---|---|
+| [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140) | Sendspin `1.0.0-rc1`: Noise KKpsk2, pairing, RC1 `client/state` | Merged 2026-10-01, not yet released. Needs aiosendspin v10.0.0, also unreleased. |
+| [sendspin-cpp#131](https://github.com/Sendspin/sendspin-cpp/issues/131) | `client/state` flagged non-compliant: legacy `state`, missing timing fields | Closed as superseded by #140. |
+
+#140 is a breaking release. No server can play until it pairs, unless the
+application enables unpaired access. The `client_id` becomes the client's
+X25519 public key, generated on first boot, so every router appears to the
+server as a new player and the key has to persist across reboots. It also
+brings `min_buffer_ms` and `required_lead_time_ms`, which settles #131.
+
+**When a sendspin-cli release pins it:** do not bump until Music Assistant
+stable ships aiosendspin v10, or the package stops working with the server
+most users run. Then add the pairing option sendspin-cli exposes to UCI and
+LuCI, and keep the identity key in persistent storage rather than RAM.
+
 ## Submission to openwrt/packages
 
 Submitted as
