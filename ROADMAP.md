@@ -61,11 +61,11 @@ little-endian PCM. **All three are reproduced** under `qemu-mips-static`.
 Until they are fixed, the package carries `@!BIG_ENDIAN` and is simply not
 offered rather than offered and wrong.
 
-| Upstream | What | Evidence |
-|---|---|---|
-| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 |
-| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address |
-| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 |
+| Upstream | What | Evidence | Status |
+|---|---|---|---|
+| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
+| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address | open |
+| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 | open |
 
 Each was demonstrated by building the file or library unchanged for MIPS
 big-endian and running it under `qemu-mips-static`, with the same harness on
@@ -73,11 +73,13 @@ x86_64 as the control. The pattern is the same in all three: the careful path
 writes bytes one at a time and is correct anywhere, the convenient path casts
 the buffer at native width.
 
-Upstream confirmed the diagnosis on sendspin-cpp-cli#70 on 2026-09-21 and has
-no fix: its unpublished draft still carries the native-endian accesses, it has
-no reproduction of its own, and it notes that its existing 16- and 32-bit
-tests use native-endian arrays and therefore cannot establish the contract on
-a big-endian host. So this blocker should be expected to hold for a while.
+sendspin-cli fixed the first on 2026-10-07 in sendspin-cpp-cli#77: both paths
+now assemble little-endian bytes, a new test builds its samples as bytes, and
+a CI job runs it under `qemu-mips-static`, so the defect cannot come back
+unnoticed. It is not in a release yet. Its audit found one more site, the
+PortAudio sink (sendspin-cpp-cli#78), which this package does not build. The
+Opus and FLAC defects live in sendspin-cpp and micro-flac and have had no
+answer, so this blocker should still be expected to hold for a while.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
@@ -145,11 +147,12 @@ LuCI, and keep the identity key in persistent storage rather than RAM.
 Submitted as
 [openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
 `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. Upstream
-has confirmed that defect and has no fix, so waiting would mean withholding a
-package that is correct on every little-endian target — which is most of
-OpenWrt and all of its recent hardware — for the sake of six targets it would
-be wrong on. Declining to build there is the honest way to say that, and the
-guard comes off in one line when the fixes land.
+has fixed one of the three defects, unreleased, and the other two are open, so
+waiting would mean withholding a package that is correct on every
+little-endian target — which is most of OpenWrt and all of its recent hardware
+— for the sake of six targets it would be wrong on. Declining to build there
+is the honest way to say that, and the guard comes off in one line when the
+fixes land.
 
 The mechanical requirements are met — maintainer, SPDX licence, procd init,
 `conffiles`, no patches, no out-of-tree dependencies — and were checked
