@@ -64,8 +64,8 @@ offered rather than offered and wrong.
 | Upstream | What | Evidence | Status |
 |---|---|---|---|
 | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
-| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), not released |
-| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 | open |
+| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
+| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
 
 Each was demonstrated by building the file or library unchanged for MIPS
 big-endian and running it under `qemu-mips-static`, with the same harness on
@@ -85,12 +85,22 @@ targets, and big-endian ones take the byte-wise code, so packed PCM is
 little-endian on every host. The `int32_t*` overload of `decode()` still
 returns host byte order, but sendspin-cpp calls the `uint8_t*` one, which is
 the one fixed. Upstream verified it under s390x with QEMU, and little-endian
-code generation is unchanged. It is not in a release yet (v0.2.0 is the
-latest), and sendspin-cpp still pins micro-flac v0.1.1, so it reaches this
-package only after a micro-flac release and a pin bump in sendspin-cpp.
+code generation is unchanged. It shipped in micro-flac v0.3.0 the next day.
 
-The Opus defect lives in sendspin-cpp and has had no answer, so this blocker
-should still be expected to hold for a while.
+sendspin-cpp fixed the third on 2026-10-12 in sendspin-cpp#200: the samples
+are byte-swapped after `opus_decode()`, and before `opus_encode()` on the
+source side, behind `if constexpr (std::endian::native == std::endian::big)`,
+so little-endian builds compile it to nothing. The same pull request moves the
+host build to micro-flac v0.3.0. Upstream has not run it on a big-endian
+target and asked for a test there. Both fixes shipped in sendspin-cpp v0.9.4
+the same day; ESP targets stay on micro-flac 0.1.1 until ESPHome moves, which
+does not matter on little-endian hardware.
+
+What is left is downstream of the fixes. sendspin-cli `main` has the volume
+fix but pins a sendspin-cpp commit from before v0.9.4, and its latest release
+is still 0.3.0. And sendspin-cpp v0.9.x speaks only the `1.0.0-rc1` protocol
+(blocker 5), so the bump that brings these fixes is the rc1 bump, gated on
+Music Assistant stable.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
@@ -158,7 +168,8 @@ LuCI, and keep the identity key in persistent storage rather than RAM.
 Submitted as
 [openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
 `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. Upstream
-has fixed two of the three defects, unreleased, and the third is open, so
+has fixed all three defects, but they reach this package only with the rc1
+bump of blocker 5, so
 waiting would mean withholding a package that is correct on every
 little-endian target — which is most of OpenWrt and all of its recent hardware
 — for the sake of six targets it would be wrong on. Declining to build there

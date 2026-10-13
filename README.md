@@ -155,17 +155,20 @@ service umdns reload
   | Where | Upstream | Result on MIPS big-endian | Status |
   |---|---|---|---|
   | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | 57/64 and 60/64 samples wrong | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
-  | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | wrong on the aligned fast paths only | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), not released |
-  | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | decoder writes -45, a little-endian reader gets -11265 | open |
+  | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | wrong on the aligned fast paths only | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
+  | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
 
   The pattern is the same in all three: the careful path writes bytes one at a
   time and is correct anywhere, the convenient path casts the buffer at native
   width. sendspin-cli fixed the first in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77) on 2026-10-07, with a test
   that builds its samples as little-endian bytes and a CI job that runs it
   under `qemu-mips-static`. micro-flac fixed the second in [#54](https://github.com/esphome-libs/micro-flac/pull/54) on
-  2026-10-11: packed PCM is now little-endian on every host. Neither fix is in
-  a release yet, and sendspin-cpp still pins micro-flac v0.1.1. The Opus one
-  has had no answer. Little-endian targets are not affected. Tracked in
+  2026-10-11, and sendspin-cpp the third in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200) on 2026-10-12, which also
+  moves its host build to micro-flac v0.3.0. sendspin-cpp v0.9.4 carries both;
+  the volume fix is still waiting for a sendspin-cli release. v0.9.4 also
+  speaks only the Sendspin `1.0.0-rc1` protocol, so the guard comes off with
+  that bump, not before (see the [roadmap](ROADMAP.md)). Little-endian
+  targets are not affected. Tracked in
   [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
   service instances when a network comes up, and on networks with an mDNS
@@ -234,9 +237,10 @@ limit. The list below is the tactical work; that page is the coverage story.
 - [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test once the three
   byte-order defects are fixed upstream
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three are
-  reported with the qemu-mips reproducer. The software-volume and FLAC ones
-  are fixed on `main` upstream, waiting for releases (and, for FLAC, for
-  sendspin-cpp to move off micro-flac v0.1.1); the Opus one is open.
+  reported with the qemu-mips reproducer, and all three are now fixed
+  upstream. FLAC and Opus are released in sendspin-cpp v0.9.4; the volume fix
+  waits for a sendspin-cli release, which also has to pin v0.9.4 or later.
+  That release brings the rc1 protocol, so this lands with the rc1 bump.
 
 ## Continuous integration
 
