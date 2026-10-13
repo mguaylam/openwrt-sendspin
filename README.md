@@ -232,8 +232,8 @@ limit. The list below is the tactical work; that page is the coverage story.
   the package will need a pairing or PSK option of its own, here and in the
   LuCI app. Upstream merged it in
   [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140)
-  (Sendspin `1.0.0-rc1`), which is not released yet and needs a server
-  running aiosendspin v10; see the [roadmap](ROADMAP.md).
+  (Sendspin `1.0.0-rc1`), released in sendspin-cpp v0.9.0. It needs Music
+  Assistant 2.11, still in beta; see the [roadmap](ROADMAP.md).
 - [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test once the three
   byte-order defects are fixed upstream
   ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three are
