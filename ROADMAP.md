@@ -61,11 +61,11 @@ little-endian PCM. **All three are reproduced** under `qemu-mips-static`.
 Until they are fixed, the package carries `@!BIG_ENDIAN` and is simply not
 offered rather than offered and wrong.
 
-| Upstream | What | Evidence |
-|---|---|---|
-| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 |
-| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address |
-| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 |
+| Upstream | What | Evidence | Status |
+|---|---|---|---|
+| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
+| [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
+| [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
 
 Each was demonstrated by building the file or library unchanged for MIPS
 big-endian and running it under `qemu-mips-static`, with the same harness on
@@ -73,11 +73,34 @@ x86_64 as the control. The pattern is the same in all three: the careful path
 writes bytes one at a time and is correct anywhere, the convenient path casts
 the buffer at native width.
 
-Upstream confirmed the diagnosis on sendspin-cpp-cli#70 on 2026-09-21 and has
-no fix: its unpublished draft still carries the native-endian accesses, it has
-no reproduction of its own, and it notes that its existing 16- and 32-bit
-tests use native-endian arrays and therefore cannot establish the contract on
-a big-endian host. So this blocker should be expected to hold for a while.
+sendspin-cli fixed the first on 2026-10-07 in sendspin-cpp-cli#77: both paths
+now assemble little-endian bytes, a new test builds its samples as bytes, and
+a CI job runs it under `qemu-mips-static`, so the defect cannot come back
+unnoticed. It is not in a release yet. Its audit found one more site, the
+PortAudio sink (sendspin-cpp-cli#78), which this package does not build.
+
+micro-flac fixed the second on 2026-10-11 in micro-flac#54: a new
+`FLAC_LITTLE_ENDIAN` macro keeps the native-width fast paths to little-endian
+targets, and big-endian ones take the byte-wise code, so packed PCM is
+little-endian on every host. The `int32_t*` overload of `decode()` still
+returns host byte order, but sendspin-cpp calls the `uint8_t*` one, which is
+the one fixed. Upstream verified it under s390x with QEMU, and little-endian
+code generation is unchanged. It shipped in micro-flac v0.3.0 the next day.
+
+sendspin-cpp fixed the third on 2026-10-12 in sendspin-cpp#200: the samples
+are byte-swapped after `opus_decode()`, and before `opus_encode()` on the
+source side, behind `if constexpr (std::endian::native == std::endian::big)`,
+so little-endian builds compile it to nothing. The same pull request moves the
+host build to micro-flac v0.3.0. Upstream has not run it on a big-endian
+target and asked for a test there. Both fixes shipped in sendspin-cpp v0.9.4
+the same day; ESP targets stay on micro-flac 0.1.1 until ESPHome moves, which
+does not matter on little-endian hardware.
+
+What is left is downstream of the fixes. sendspin-cli `main` has the volume
+fix but pins a sendspin-cpp commit from before v0.9.4, and its latest release
+is still 0.3.0. And sendspin-cpp v0.9.x speaks only the `1.0.0-rc1` protocol
+(blocker 5), so the bump that brings these fixes is the rc1 bump, gated on
+Music Assistant stable.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
@@ -126,7 +149,7 @@ own, here and in the LuCI app.
 
 | Upstream | What | Status |
 |---|---|---|
-| [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140) | Sendspin `1.0.0-rc1`: Noise KKpsk2, pairing, RC1 `client/state` | Merged 2026-10-01, not yet released. Needs aiosendspin v10.0.0, also unreleased. |
+| [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140) | Sendspin `1.0.0-rc1`: Noise KKpsk2, pairing, RC1 `client/state` | Merged 2026-10-01, released in v0.9.0 on 2026-10-07. Needs aiosendspin v10, released 2026-10-05, and Music Assistant 2.11, still in beta. |
 | [sendspin-cpp#131](https://github.com/Sendspin/sendspin-cpp/issues/131) | `client/state` flagged non-compliant: legacy `state`, missing timing fields | Closed as superseded by #140. |
 
 #140 is a breaking release. No server can play until it pairs, unless the
@@ -135,9 +158,13 @@ X25519 public key, generated on first boot, so every router appears to the
 server as a new player and the key has to persist across reboots. It also
 brings `min_buffer_ms` and `required_lead_time_ms`, which settles #131.
 
+v0.9.0 is not wire-compatible with earlier servers: Music Assistant needs
+2.11.0b4 or newer, and the stable channel is still on 2.10 (2.10.6 on
+2026-10-09). sendspin-cli has not released against it yet.
+
 **When a sendspin-cli release pins it:** do not bump until Music Assistant
 stable ships aiosendspin v10, or the package stops working with the server
-most users run. Then add the pairing option sendspin-cli exposes to UCI and
+most users run. The big-endian fixes of blocker 1 come with the same bump. Then add the pairing option sendspin-cli exposes to UCI and
 LuCI, and keep the identity key in persistent storage rather than RAM.
 
 ## Submission to openwrt/packages
@@ -145,11 +172,13 @@ LuCI, and keep the identity key in persistent storage rather than RAM.
 Submitted as
 [openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
 `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. Upstream
-has confirmed that defect and has no fix, so waiting would mean withholding a
-package that is correct on every little-endian target — which is most of
-OpenWrt and all of its recent hardware — for the sake of six targets it would
-be wrong on. Declining to build there is the honest way to say that, and the
-guard comes off in one line when the fixes land.
+has fixed all three defects, but they reach this package only with the rc1
+bump of blocker 5, so
+waiting would mean withholding a package that is correct on every
+little-endian target — which is most of OpenWrt and all of its recent hardware
+— for the sake of six targets it would be wrong on. Declining to build there
+is the honest way to say that, and the guard comes off in one line when the
+fixes land.
 
 The mechanical requirements are met — maintainer, SPDX licence, procd init,
 `conffiles`, no patches, no out-of-tree dependencies — and were checked
