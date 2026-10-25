@@ -16,8 +16,8 @@ Three things, in order. A target is only covered when all three hold:
 2. **The audio is correct** — not merely that the player starts.
 3. **The server finds the player again** after a reboot, without a hand on it.
 
-Point 2 is why big-endian is not covered, and point 3 is why no target is
-fully covered yet.
+Big-endian is not covered because the player cannot connect there (blocker
+1), and point 3 is why no target is fully covered yet.
 
 ## Architecture coverage
 
@@ -27,7 +27,7 @@ fully covered yet.
 | `mediatek/filogic` | `aarch64_cortex-a53` | little | builds in CI; not run on hardware |
 | `x86/64` | `x86_64` | little | builds in CI; not run on hardware |
 | Other little-endian (`ipq40xx`, `mvebu`, `sunxi`, `rockchip`, `bcm27xx`, `qualcommax`…) | various | little | expected to build; untested |
-| `ath79` | `mips_24kc` | **big** | **not offered** — blocked by byte order |
+| `ath79` | `mips_24kc` | **big** | **not offered** — blocked by noise-c's byte order |
 | `lantiq`, `realtek` | `mips_*` | **big** | **not offered** — same |
 | `bmips` | `mips_mips32` | **big** | **not offered** — same |
 | `mpc85xx` | `powerpc_8548` | **big** | **not offered** — same |
@@ -98,12 +98,35 @@ does not matter on little-endian hardware.
 
 sendspin-cli 0.4.0, released on 2026-10-15 and packaged here since, carries
 all three: its own volume fix, and sendspin-cpp v0.9.5 with micro-flac v0.3.0.
-What is left is to check the package on big-endian before the guard comes
-off, since upstream has not played audio on such a target.
+
+**Checked on big-endian on 2026-10-25, and a new blocker found.** The 0.4.0
+package built for `mips_24kc` and run under `qemu-mips-static`, against a test
+server on aiosendspin 10.2.1 with the x86_64 package as the control, fails
+the Noise handshake: rc1's encryption goes through noise-c's reference
+backend, whose X25519 fails the RFC 7748 vectors on big-endian and whose
+ChaCha20-Poly1305 differs from an independent implementation. Three defects,
+in noise-c v0.1.13 and still in v0.1.31:
+
+- `x25519.c` tests `#if BYTE_ORDER == LITTLE_ENDIAN` without `<endian.h>`;
+  both macros read as 0, so the little-endian path is built everywhere and
+  the `#error` meant for big-endian never fires.
+- `x25519_core()` assigns `x1 = (const uint8_t *)x1` where it means `x1i`, so
+  the byte-swapped input is dropped. On little-endian the swap is a copy.
+- `chacha_keysetup()` copies the "expand 32-byte k" constant into 32-bit
+  words with `memcpy`. The same line is in rweather/noise-c.
+
+With the three corrected in a local test build, the handshake completes, and
+the audio defects above check out as fixed: PCM, FLAC 16 and 24-bit and Opus
+decode a test tone exactly as on x86_64, and software volume at 16, 24 and
+32-bit is identical byte for byte to MIPS little-endian. The test harness
+needed two concessions to qemu-user: `getifaddrs()` stubbed out, since
+qemu-user mistranslates musl's netlink dump for a big-endian guest, and
+software volume checked by unit rather than end to end, since an ALSA device
+without a clock cannot be captured in real time.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
-**Once checked on big-endian:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
+**Once noise-c is fixed and sendspin-cpp picks it up:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
 `lantiq`, `realtek`, `mpc85xx`, `octeon` and `bmips` become available in one
 line. The `ath79` runtime test comes back with them.
 
@@ -170,8 +193,8 @@ not matter on that side.
 Submitted as
 [openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
 `@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. The
-fixes have now reached this package, but they are not yet checked on a
-big-endian target, and
+audio fixes have reached this package and check out on big-endian, but
+noise-c's encryption does not work there yet, and
 waiting would mean withholding a package that is correct on every
 little-endian target — which is most of OpenWrt and all of its recent hardware
 — for the sake of six targets it would be wrong on. Declining to build there
