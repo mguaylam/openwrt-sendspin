@@ -209,6 +209,15 @@ service umdns reload
   So the guard comes off once noise-c is fixed and sendspin-cpp picks the fix
   up. Little-endian targets are not affected. Tracked in
   [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
+- **First connection after a new identity.** After an upgrade from 0.3.0, or
+  once the state file is deleted, the player starts with a new identity.
+  Music Assistant keeps dialling the player it knew, whose key no longer
+  matches, and does not notice the new one until the mDNS announcement is
+  withdrawn and made again. Observed on both DIR-3040s: restarting Music
+  Assistant, or stopping the player for 15 seconds and starting it again
+  (`service sendspin-cli stop; sleep 15; service sendspin-cli start`), lets it
+  connect. It then pairs as a new player; the old entry can be removed from
+  Music Assistant. Later restarts reconnect on their own.
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
   service instances when a network comes up, and on networks with an mDNS
   reflector it takes its own reflected probe for a name conflict and stops
