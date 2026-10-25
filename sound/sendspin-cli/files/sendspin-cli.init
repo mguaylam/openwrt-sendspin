@@ -20,7 +20,7 @@ validate_player_section() {
 		'mdns:bool:1' \
 		'server:string' \
 		'log_level:or("none","error","warn","info","debug","verbose"):info' \
-		'state_dir:string:/var/lib/sendspin-cli'
+		'state_dir:string:/etc/sendspin-cli'
 }
 
 start_player() {

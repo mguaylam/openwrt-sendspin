@@ -144,6 +144,10 @@ define Package/sendspin-cli/install
 	$(INSTALL_BIN) ./files/sendspin-cli.init $(1)/etc/init.d/sendspin-cli
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_DATA) ./files/sendspin-cli.hotplug $(1)/etc/hotplug.d/iface/50-sendspin-cli
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/sendspin-cli.defaults $(1)/etc/uci-defaults/50-sendspin-cli
+	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
+	$(INSTALL_DATA) ./files/sendspin-cli.upgrade $(1)/lib/upgrade/keep.d/sendspin-cli
 endef
 
 $(eval $(call BuildPackage,sendspin-cli))

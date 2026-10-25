@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# The state directory used to default to RAM, which now loses the
+# player's identity and pairings at every reboot.
+migrate_player() {
+	[ "$(uci -q get "sendspin-cli.$1.state_dir")" = /var/lib/sendspin-cli ] &&
+		uci set "sendspin-cli.$1.state_dir=/etc/sendspin-cli"
+}
+
+. /lib/functions.sh
+config_load sendspin-cli
+config_foreach migrate_player player
+uci commit sendspin-cli
+
+exit 0
