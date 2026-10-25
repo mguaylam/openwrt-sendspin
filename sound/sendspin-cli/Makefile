@@ -3,12 +3,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sendspin-cli
-PKG_VERSION:=0.3.0
-PKG_RELEASE:=4
+PKG_VERSION:=0.4.0
+PKG_RELEASE:=1
 
 PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=baa9febbc08d58e1780d6a62fb0b20d458cd1a3cbb177929ba5f4ff0b01d335c
+PKG_HASH:=baa7b5e05b504b7d530aecc21aba17b65793c570ff27587bf6351fe2f24d4b24
 PKG_BUILD_DIR:=$(BUILD_DIR)/sendspin-cpp-cli-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Michaël Guay-Lambert <mguaylam.dev@gmail.com>
@@ -18,16 +18,18 @@ PKG_LICENSE_FILES:=LICENSE \
 	openwrt-deps/sendspin-cpp/LICENSE \
 	openwrt-deps/ArduinoJson/LICENSE.txt \
 	openwrt-deps/IXWebSocket/LICENSE.txt \
-	openwrt-deps/micro-flac/LICENSE
+	openwrt-deps/micro-flac/LICENSE \
+	openwrt-deps/noise-c/LICENSE
 
 PKG_BUILD_FLAGS:=no-mips16
 
 # The versions sendspin-cli v$(PKG_VERSION) pins through FetchContent
 # (SENDSPIN_GIT_TAG, then sendspin-cpp's cmake/host.cmake).
-SENDSPIN_CPP_VERSION:=0.8.0
+SENDSPIN_CPP_VERSION:=0.9.5
 ARDUINOJSON_VERSION:=7.4.1
-IXWEBSOCKET_VERSION:=11.4.5
-MICRO_FLAC_VERSION:=0.1.1
+IXWEBSOCKET_VERSION:=12.0.1
+MICRO_FLAC_VERSION:=0.3.0
+NOISE_C_VERSION:=0.1.13
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -59,7 +61,7 @@ endef
 define Download/sendspin-cpp
   URL:=https://codeload.github.com/Sendspin/sendspin-cpp/tar.gz/v$(SENDSPIN_CPP_VERSION)?
   FILE:=sendspin-cpp-$(SENDSPIN_CPP_VERSION).tar.gz
-  HASH:=cfd485ca5ecaff2406af382f309ce7d0c8709d56ac6c0a3a7420f8d423978a02
+  HASH:=e76e9491db42a8c00d7a978579dbf8a0b2f7459d49396baabf260d12cc7ffc6f
 endef
 $(eval $(call Download,sendspin-cpp))
 
@@ -73,16 +75,23 @@ $(eval $(call Download,arduinojson))
 define Download/ixwebsocket
   URL:=https://codeload.github.com/machinezone/IXWebSocket/tar.gz/v$(IXWEBSOCKET_VERSION)?
   FILE:=IXWebSocket-$(IXWEBSOCKET_VERSION).tar.gz
-  HASH:=c5fc225edec32bf7d583e55347ef2c9c4940d005c13ef5e848354a85602f5fd6
+  HASH:=d23bdc91dbfe2b9ae13c322d539392d7a6b8b506560f41c90e227fa0f86a2405
 endef
 $(eval $(call Download,ixwebsocket))
 
 define Download/micro-flac
   URL:=https://codeload.github.com/esphome-libs/micro-flac/tar.gz/v$(MICRO_FLAC_VERSION)?
   FILE:=micro-flac-$(MICRO_FLAC_VERSION).tar.gz
-  HASH:=4cc9c69f1ec06e7d0a7bd116bc61cc3f398d056eb9b2e9402a8a4790e307e854
+  HASH:=ac2c7a8ef05485b36f50468b056ec93ffb2503632b18b64a8966d0feb1c13337
 endef
 $(eval $(call Download,micro-flac))
+
+define Download/noise-c
+  URL:=https://codeload.github.com/esphome-libs/noise-c/tar.gz/v$(NOISE_C_VERSION)?
+  FILE:=noise-c-$(NOISE_C_VERSION).tar.gz
+  HASH:=a8ad31c6306150ab3ab24d0337efe82bf54f6404c23eaf42af5d1d2a62e4af01
+endef
+$(eval $(call Download,noise-c))
 
 DEPS_DIR:=$(PKG_BUILD_DIR)/openwrt-deps
 
@@ -98,6 +107,7 @@ define Build/Prepare
 	$(call Prepare/dependency,ArduinoJson,ArduinoJson-$(ARDUINOJSON_VERSION).tar.gz)
 	$(call Prepare/dependency,IXWebSocket,IXWebSocket-$(IXWEBSOCKET_VERSION).tar.gz)
 	$(call Prepare/dependency,micro-flac,micro-flac-$(MICRO_FLAC_VERSION).tar.gz)
+	$(call Prepare/dependency,noise-c,noise-c-$(NOISE_C_VERSION).tar.gz)
 	$(CP) ./cmake/micro-opus $(DEPS_DIR)/
 endef
 
@@ -112,6 +122,7 @@ CMAKE_OPTIONS += \
 	-DFETCHCONTENT_SOURCE_DIR_IXWEBSOCKET=$(DEPS_DIR)/IXWebSocket \
 	-DFETCHCONTENT_SOURCE_DIR_MICRO_FLAC=$(DEPS_DIR)/micro-flac \
 	-DFETCHCONTENT_SOURCE_DIR_MICRO_OPUS=$(DEPS_DIR)/micro-opus \
+	-DFETCHCONTENT_SOURCE_DIR_NOISE_C=$(DEPS_DIR)/noise-c \
 	-DMICRO_FLAC_ENABLE_OGG=OFF \
 	-DSENDSPIN_CLI_BUILD_TESTS=OFF \
 	-DSENDSPIN_CLI_WITH_ALSA=ON \
@@ -133,6 +144,10 @@ define Package/sendspin-cli/install
 	$(INSTALL_BIN) ./files/sendspin-cli.init $(1)/etc/init.d/sendspin-cli
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_DATA) ./files/sendspin-cli.hotplug $(1)/etc/hotplug.d/iface/50-sendspin-cli
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/sendspin-cli.defaults $(1)/etc/uci-defaults/50-sendspin-cli
+	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
+	$(INSTALL_DATA) ./files/sendspin-cli.upgrade $(1)/lib/upgrade/keep.d/sendspin-cli
 endef
 
 $(eval $(call BuildPackage,sendspin-cli))
