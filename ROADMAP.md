@@ -48,7 +48,7 @@ of otherwise supported hardware:
 | | |
 |---|---|
 | **A USB port** | The player outputs through ALSA to a USB DAC. No I²S support. |
-| **Flash** | About 1.45 MiB installed, with `libopus`, `libstdcpp6` and `umdns`. Comfortable on 16 MB, tight on 8 MB, out of the question on 4 MB. |
+| **Flash** | About 1.45 MiB installed, with `libopus`, `libstdcpp6` and `umdns`, measured on 0.3.0; the 0.4.0 package is 127 KiB larger. Comfortable on 16 MB, tight on 8 MB, out of the question on 4 MB. |
 | **RAM** | 5 MiB resident measured. Fine on 64 MB. |
 | **CPU** | 6.3 % of one thread on an 880 MHz MIPS 1004Kc without FPU, decoding FLAC 48 kHz/16-bit with software volume. Comparable single-core hardware should cope. |
 
@@ -63,7 +63,7 @@ offered rather than offered and wrong.
 
 | Upstream | What | Evidence | Status |
 |---|---|---|---|
-| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
+| [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | `apply_volume()` casts the buffer at native width for 16- and 32-bit | **reproduced**: 57/64 and 60/64 samples wrong on MIPS BE, exact on x86_64 | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), released in 0.4.0 |
 | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | `write_samples()` fast paths cast; the generic and 24-bit ones are byte-wise | **reproduced**, and gated on buffer alignment — correct or corrupt by address | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
 | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | `opus_decode()` fills its output with native `opus_int16` | **reproduced**: the decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
 
@@ -76,7 +76,7 @@ the buffer at native width.
 sendspin-cli fixed the first on 2026-10-07 in sendspin-cpp-cli#77: both paths
 now assemble little-endian bytes, a new test builds its samples as bytes, and
 a CI job runs it under `qemu-mips-static`, so the defect cannot come back
-unnoticed. It is not in a release yet. Its audit found one more site, the
+unnoticed. It shipped in sendspin-cli 0.4.0. Its audit found one more site, the
 PortAudio sink (sendspin-cpp-cli#78), which this package does not build.
 
 micro-flac fixed the second on 2026-10-11 in micro-flac#54: a new
@@ -96,15 +96,14 @@ target and asked for a test there. Both fixes shipped in sendspin-cpp v0.9.4
 the same day; ESP targets stay on micro-flac 0.1.1 until ESPHome moves, which
 does not matter on little-endian hardware.
 
-What is left is downstream of the fixes. sendspin-cli `main` has the volume
-fix but pins a sendspin-cpp commit from before v0.9.4, and its latest release
-is still 0.3.0. And sendspin-cpp v0.9.x speaks only the `1.0.0-rc1` protocol
-(blocker 5), so the bump that brings these fixes is the rc1 bump, gated on
-Music Assistant stable.
+sendspin-cli 0.4.0, released on 2026-10-15 and packaged here since, carries
+all three: its own volume fix, and sendspin-cpp v0.9.5 with micro-flac v0.3.0.
+What is left is to check the package on big-endian before the guard comes
+off, since upstream has not played audio on such a target.
 
 Tracked here as [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 
-**When all three land:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
+**Once checked on big-endian:** drop `@!BIG_ENDIAN` from `DEPENDS`, and `ath79`,
 `lantiq`, `realtek`, `mpc85xx`, `octeon` and `bmips` become available in one
 line. The `ath79` runtime test comes back with them.
 
@@ -135,45 +134,44 @@ the package is no longer built. That test returns with blocker 1.
 The player attenuates in software, so every dB of volume reduction costs
 resolution on a 16-bit output. A USB DAC with a hardware mixer — which is
 common — could do it losslessly, but driving one is upstream roadmap item 15
-(`-V`, `snd_mixer_*`), not implemented in 0.3.0. A `mixer` UCI option here
+(`-V`, `snd_mixer_*`), not implemented in 0.4.0. A `mixer` UCI option here
 depends on it.
 
-### 5. Encrypted transport — not a blocker today, will be one
+### 5. Encrypted transport — done in 0.4.0
 
 The Sendspin spec authenticates in the handshake with a Noise exchange and a
-PSK. sendspin-cpp v0.8.0 sends the legacy clear-text `client/hello` and has no
-PSK or pairing code at all, which upstream's own roadmap records, recommending
-a host firewall meanwhile. Servers accept this only while they run in
-transition mode. When that ends, the package needs a pairing option of its
-own, here and in the LuCI app.
+PSK. Up to 0.3.0 the player sent the legacy clear-text `client/hello`, which a
+server accepts only while it runs in transition mode.
 
 | Upstream | What | Status |
 |---|---|---|
-| [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140) | Sendspin `1.0.0-rc1`: Noise KKpsk2, pairing, RC1 `client/state` | Merged 2026-10-01, released in v0.9.0 on 2026-10-07. Needs aiosendspin v10, released 2026-10-05, and Music Assistant 2.11, still in beta. |
+| [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140) | Sendspin `1.0.0-rc1`: Noise KKpsk2, pairing, RC1 `client/state` | Released in sendspin-cpp v0.9.0 on 2026-10-07, and in sendspin-cli 0.4.0 on 2026-10-15. |
 | [sendspin-cpp#131](https://github.com/Sendspin/sendspin-cpp/issues/131) | `client/state` flagged non-compliant: legacy `state`, missing timing fields | Closed as superseded by #140. |
 
-#140 is a breaking release. No server can play until it pairs, unless the
-application enables unpaired access. The `client_id` becomes the client's
-X25519 public key, generated on first boot, so every router appears to the
-server as a new player and the key has to persist across reboots. It also
-brings `min_buffer_ms` and `required_lead_time_ms`, which settles #131.
+Since 0.4.0 every connection is encrypted, and a server must pair with the
+player before it can play. The `client_id` is the player's X25519 public key,
+generated on first start, so the package now keeps the state file in
+`/etc/sendspin-cli` and through a sysupgrade: in RAM, every reboot would make a
+new player that each server would have to pair with again.
 
-v0.9.0 is not wire-compatible with earlier servers: Music Assistant needs
-2.11.0b4 or newer, and the stable channel is still on 2.10 (2.10.6 on
-2026-10-09). sendspin-cli has not released against it yet.
+The package pairs from the shell with `/etc/init.d/sendspin-cli pair`, which
+prints the token to paste into the server and the code of an attempt in
+progress, and answers a waiting attempt with `pair confirm` or `pair cancel`.
+The LuCI app does the same from *Services → Sendspin*. `allow_unpaired` lets
+any server play, and is off by default.
 
-**When a sendspin-cli release pins it:** do not bump until Music Assistant
-stable ships aiosendspin v10, or the package stops working with the server
-most users run. The big-endian fixes of blocker 1 come with the same bump. Then add the pairing option sendspin-cli exposes to UCI and
-LuCI, and keep the identity key in persistent storage rather than RAM.
+An rc1 player cannot talk to an older server. Music Assistant speaks rc1 since
+2.10.7, released on 2026-10-17 with aiosendspin 10.2.0, so the bump waited for
+that. An rc1 server still accepts older players, so the order of upgrades does
+not matter on that side.
 
 ## Submission to openwrt/packages
 
 Submitted as
 [openwrt/packages#30577](https://github.com/openwrt/packages/pull/30577), with
-`@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. Upstream
-has fixed all three defects, but they reach this package only with the rc1
-bump of blocker 5, so
+`@!BIG_ENDIAN` in place rather than waiting for blocker 1 to lift. The
+fixes have now reached this package, but they are not yet checked on a
+big-endian target, and
 waiting would mean withholding a package that is correct on every
 little-endian target — which is most of OpenWrt and all of its recent hardware
 — for the sake of six targets it would be wrong on. Declining to build there
@@ -188,7 +186,7 @@ Two points that looked like findings and are not:
 
 - **`test-version.sh` is not needed.** The generic check runs the binary with
   `--version` and expects `PKG_VERSION` in the output; `sendspin-cli
-  --version` prints `sendspin-cli 0.3.0`.
+  --version` prints `sendspin-cli 0.4.0`.
 - **`codeload.github.com` is correct here, not a missing `@GITHUB`.** That
   macro resolves to `https://raw.githubusercontent.com` in
   `scripts/projectsmirrors.json`, which serves individual files and cannot

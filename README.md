@@ -18,10 +18,12 @@ feed is where it is developed and tested until it lands there.
 
 | | |
 |---|---|
-| `sound/sendspin-cli` package (0.3.0) | written |
+| `sound/sendspin-cli` package (0.4.0) | written |
 | Build with the OpenWrt SDK | verified for `ramips/mt7621` on 25.12.5; other targets through CI |
 | Install and service on a router | verified on the DIR-3040 |
 | Playback from Music Assistant, multi-room | verified on the DIR-3040 |
+| Upgrade from 0.3.0, configuration carried over | verified on the DIR-3040 |
+| Pairing with Music Assistant 2.10.8, by code | verified on the DIR-3040; kept across a service restart and a router reboot |
 | Rediscovery after a service restart | verified |
 | Rediscovery after a router reboot | works through a workaround for umdns, but not every time — see [known limitations](#known-limitations) |
 | USB DAC unplugged and plugged back during playback | verified on 0.3.0, twice in one track, with no workaround |
@@ -43,7 +45,7 @@ Measured on this setup while playing from Music Assistant:
 | CPU | 6.3 % of one of the four threads, decoding and software volume included |
 | Memory | 5 MiB resident |
 | Underruns | none over 49 hours of continuous playback |
-| Package | 246 KiB; 1.45 MiB of flash with `libopus`, `libstdcpp6` and `umdns` |
+| Package | 373 KiB, 865 KiB installed (0.4.0); 1.45 MiB of flash with `libopus`, `libstdcpp6` and `umdns`, measured on 0.3.0, whose package was 246 KiB |
 
 Reports from other hardware are welcome; please include the output of
 `cat /proc/asound/card*/stream*`.
@@ -107,6 +109,38 @@ locally:
 sendspin-cli status --control-socket /var/run/sendspin-cli/main.sock
 ```
 
+### Pairing
+
+Every connection is encrypted, and a server must pair with the player before
+it can play. That needs Music Assistant 2.10.7 or newer. Pairing is done once
+per server: the player remembers it in its state directory.
+
+```sh
+service sendspin-cli pair
+```
+
+prints, for each running player, the pairing token and the state of any
+pairing attempt:
+
+```
+main:
+  name: Salle à manger
+  server: not connected
+  trust: not connected
+  pairing: none
+  token: SP:0TNMH6…
+```
+
+Paste the token into the server, or ask the server to pair with a code: the
+6-digit code then appears on a `pairing code:` line, and in the log, while the
+attempt runs. `service sendspin-cli pair confirm` and `pair cancel` answer an
+attempt waiting on the player, after a server tried a static code. The LuCI
+app offers the same from *Services → Sendspin*. Treat the token like a
+password: whoever holds it can pair a server.
+
+Setting `allow_unpaired` lets any server play without pairing. Connections
+are encrypted either way.
+
 ### Routers with more than one network
 
 umdns only announces the player on the networks listed in
@@ -136,8 +170,10 @@ service umdns reload
 - **mDNS through umdns.** The player is built without mDNS; its procd service
   announces `_sendspin._tcp` through umdns instead, which avoids Avahi and D-Bus.
 - **Unprivileged.** The service runs as the `sendspin` user in the `audio`
-  group. State (volume, static delay, last server) is kept in RAM by default to
-  spare the flash.
+  group. Its state (identity, pairings, volume, output delay) is kept in
+  `/etc/sendspin-cli`, and through a sysupgrade, since losing the identity
+  would make every server pair again. The file is only rewritten when one of
+  them changes.
 - **No MIPS16.** Audio decoding runs on the CPU in real time, so the package is
   built without MIPS16, like mpd and pulseaudio.
 
@@ -154,7 +190,7 @@ service umdns reload
 
   | Where | Upstream | Result on MIPS big-endian | Status |
   |---|---|---|---|
-  | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | 57/64 and 60/64 samples wrong | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), not released |
+  | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | 57/64 and 60/64 samples wrong | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), released in 0.4.0 |
   | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | wrong on the aligned fast paths only | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
   | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
 
@@ -164,10 +200,9 @@ service umdns reload
   that builds its samples as little-endian bytes and a CI job that runs it
   under `qemu-mips-static`. micro-flac fixed the second in [#54](https://github.com/esphome-libs/micro-flac/pull/54) on
   2026-10-11, and sendspin-cpp the third in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200) on 2026-10-12, which also
-  moves its host build to micro-flac v0.3.0. sendspin-cpp v0.9.4 carries both;
-  the volume fix is still waiting for a sendspin-cli release. v0.9.4 also
-  speaks only the Sendspin `1.0.0-rc1` protocol, so the guard comes off with
-  that bump, not before (see the [roadmap](ROADMAP.md)). Little-endian
+  moves its host build to micro-flac v0.3.0. sendspin-cli 0.4.0, packaged
+  here, carries all three; the guard comes off once the package is checked on
+  big-endian (see the [roadmap](ROADMAP.md)). Little-endian
   targets are not affected. Tracked in
   [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
@@ -218,29 +253,10 @@ limit. The list below is the tactical work; that page is the coverage story.
   watching CPU, underruns and sync.
 - [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
   procd logs as `daemon.err` whatever the message's level.
-- [ ] Offer the encrypted transport once sendspin-cpp implements it. The
-  Sendspin spec authenticates in the handshake: a client whose first frame is
-  `client/init` runs a Noise exchange against a PSK and gets an encrypted
-  transport, while a first frame of `client/hello` is the legacy clear-text
-  path, which a server accepts only while it runs in transition mode.
-  sendspin-cpp v0.8.0 sends `client/hello` and carries no Noise or PSK code at
-  all; its own roadmap records having no inbound authentication of any kind
-  and names a host firewall as the mitigation meanwhile, which is what the
-  firewall zone in [routers with more than one
-  network](#routers-with-more-than-one-network) already provides. This will
-  not arrive with a version bump alone: the server admits a client by PSK, so
-  the package will need a pairing or PSK option of its own, here and in the
-  LuCI app. Upstream merged it in
-  [sendspin-cpp#140](https://github.com/Sendspin/sendspin-cpp/pull/140)
-  (Sendspin `1.0.0-rc1`), released in sendspin-cpp v0.9.0. It needs Music
-  Assistant 2.11, still in beta; see the [roadmap](ROADMAP.md).
-- [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test once the three
-  byte-order defects are fixed upstream
-  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three are
-  reported with the qemu-mips reproducer, and all three are now fixed
-  upstream. FLAC and Opus are released in sendspin-cpp v0.9.4; the volume fix
-  waits for a sendspin-cli release, which also has to pin v0.9.4 or later.
-  That release brings the rc1 protocol, so this lands with the rc1 bump.
+- [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test
+  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three
+  byte-order defects are fixed in sendspin-cli 0.4.0; check the package under
+  `qemu-mips-static` first.
 
 ## Continuous integration
 
