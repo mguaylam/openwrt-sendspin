@@ -15,7 +15,7 @@ validate_player_section() {
 		'device:string:hw:0,0' \
 		'audio_format:string' \
 		'buffer_ms:range(10,2000):100' \
-		'static_delay:uinteger:0' \
+		'output_delay:uinteger:0' \
 		'port:port:8928' \
 		'mdns:bool:1' \
 		'server:string' \
@@ -41,7 +41,7 @@ start_player() {
 		--name "$name" \
 		--output "$device" \
 		--buffer-ms "$buffer_ms" \
-		--static-delay "$static_delay" \
+		--output-delay "$output_delay" \
 		--port "$port" \
 		--log-level "$log_level" \
 		--state-dir "$state_dir" \
