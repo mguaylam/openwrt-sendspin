@@ -27,7 +27,7 @@ feed is where it is developed and tested until it lands there.
 | Rediscovery after a service restart | verified |
 | Rediscovery after a router reboot | works through a workaround for umdns, but not every time — see [known limitations](#known-limitations) |
 | USB DAC unplugged and plugged back during playback | verified on 0.3.0, twice in one track, with no workaround |
-| Big-endian targets (e.g. ath79) | not offered: playback is wrong, reproduced — see [known limitations](#known-limitations) |
+| Big-endian targets (e.g. ath79) | not offered: the audio is correct, but noise-c's encryption is wrong there, reproduced — see [known limitations](#known-limitations) |
 
 ## Hardware under test
 
@@ -181,29 +181,33 @@ service umdns reload
 
 - **Big-endian targets** (e.g. `ath79`, `mips_24kc`): **the package is not
   offered there.** It carries `@!BIG_ENDIAN`, so it is not selectable on those
-  targets, because playback would be wrong rather than merely imperfect.
+  targets. The audio is now correct there; the encryption is not.
 
-  Three places write samples in host byte order into buffers the ALSA sink
-  opens as little-endian. All three are reproduced: built unchanged for MIPS
-  big-endian, run under `qemu-mips-static`, with the same harness on x86_64 as
-  the control.
+  sendspin-cli 0.4.0 was built for `mips_24kc` and run under
+  `qemu-mips-static`, against a test server on aiosendspin 10.2.1, the version
+  Music Assistant ships, with the x86_64 package as the control. The Noise
+  handshake fails (`auth error in msg1 static DH`): noise-c's reference
+  backend, which sendspin-cpp builds, computes X25519 and ChaCha20 in host
+  byte order. Its X25519 fails the RFC 7748 vectors on big-endian, and its
+  ChaCha20-Poly1305 differs from an independent implementation. Three defects:
 
-  | Where | Upstream | Result on MIPS big-endian | Status |
-  |---|---|---|---|
-  | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70) | 57/64 and 60/64 samples wrong | fixed in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77), released in 0.4.0 |
-  | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36) | wrong on the aligned fast paths only | fixed in [#54](https://github.com/esphome-libs/micro-flac/pull/54), released in v0.3.0 |
-  | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132) | decoder writes -45, a little-endian reader gets -11265 | fixed in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200), released in v0.9.4 |
+  | Where | What |
+  |---|---|
+  | noise-c `src/crypto/x25519/x25519.c` | `#if BYTE_ORDER == LITTLE_ENDIAN` without `<endian.h>`: both macros read as 0, so the little-endian path is built everywhere |
+  | noise-c `src/crypto/x25519/x25519.c` | `x25519_core()` assigns `x1 = x1` where it means `x1 = x1i`, dropping the byte-swapped input |
+  | noise-c `src/crypto/chacha/chacha.c` | `chacha_keysetup()` copies the "expand 32-byte k" constant into 32-bit words with `memcpy` |
 
-  The pattern is the same in all three: the careful path writes bytes one at a
-  time and is correct anywhere, the convenient path casts the buffer at native
-  width. sendspin-cli fixed the first in [#77](https://github.com/Sendspin/sendspin-cpp-cli/pull/77) on 2026-10-07, with a test
-  that builds its samples as little-endian bytes and a CI job that runs it
-  under `qemu-mips-static`. micro-flac fixed the second in [#54](https://github.com/esphome-libs/micro-flac/pull/54) on
-  2026-10-11, and sendspin-cpp the third in [#200](https://github.com/Sendspin/sendspin-cpp/pull/200) on 2026-10-12, which also
-  moves its host build to micro-flac v0.3.0. sendspin-cli 0.4.0, packaged
-  here, carries all three; the guard comes off once the package is checked on
-  big-endian (see the [roadmap](ROADMAP.md)). Little-endian
-  targets are not affected. Tracked in
+  With the three corrected in a local test build (never in the package), the
+  handshake completes and the audio checks out on big-endian:
+
+  | Byte-order defect in the audio | Upstream | Checked on MIPS big-endian with 0.4.0 |
+  |---|---|---|
+  | `apply_volume()`, software volume | [sendspin-cpp-cli#70](https://github.com/Sendspin/sendspin-cpp-cli/issues/70), fixed in 0.4.0 | 16, 24 and 32-bit output identical byte for byte to MIPS little-endian |
+  | `write_samples()`, FLAC sample packing | [micro-flac#36](https://github.com/esphome-libs/micro-flac/issues/36), fixed in v0.3.0 | FLAC 16 and 24-bit decode a test tone exactly as x86_64 does |
+  | `opus_decode()`, Opus output buffer | [sendspin-cpp#132](https://github.com/Sendspin/sendspin-cpp/issues/132), fixed in v0.9.4 | Opus decodes the test tone as x86_64 does |
+
+  So the guard comes off once noise-c is fixed and sendspin-cpp picks the fix
+  up. Little-endian targets are not affected. Tracked in
   [#2](https://github.com/mguaylam/openwrt-sendspin/issues/2).
 - **umdns workaround.** The umdns shipped in OpenWrt 25.12 does not announce
   service instances when a network comes up, and on networks with an mDNS
@@ -254,9 +258,9 @@ limit. The list below is the tactical work; that page is the coverage story.
 - [ ] Log at the right syslog level: sendspin-cli only writes to stderr, which
   procd logs as `daemon.err` whatever the message's level.
 - [ ] Drop `@!BIG_ENDIAN` and restore the ath79 runtime test
-  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)). All three
-  byte-order defects are fixed in sendspin-cli 0.4.0; check the package under
-  `qemu-mips-static` first.
+  ([#2](https://github.com/mguaylam/openwrt-sendspin/issues/2)) once noise-c's
+  X25519 and ChaCha20 are fixed for big-endian and sendspin-cpp picks the fix
+  up. The audio already checks out there.
 
 ## Continuous integration
 

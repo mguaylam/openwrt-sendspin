@@ -39,11 +39,11 @@ define Package/sendspin-cli
   CATEGORY:=Sound
   TITLE:=Sendspin synchronized audio player
   URL:=https://github.com/Sendspin/sendspin-cpp-cli
-  # Not offered on big-endian: software volume, the Opus decoder and
-  # micro-flac's sample packing write samples in host byte order into buffers
-  # the ALSA sink opens as _LE. Reproduced under qemu-mips and reported as
-  # Sendspin/sendspin-cpp-cli#70, Sendspin/sendspin-cpp#132 and
-  # esphome-libs/micro-flac#36. Drop once they are fixed.
+  # Not offered on big-endian: noise-c's reference backend computes X25519
+  # and ChaCha20 in host byte order, so the Noise handshake fails there.
+  # Reproduced under qemu-mips against the RFC vectors; the audio itself is
+  # correct there since 0.4.0, checked the same way. Drop once noise-c is
+  # fixed.
   DEPENDS:=+alsa-lib +libatomic +libopus +libstdcpp +umdns @!BIG_ENDIAN
   USERID:=sendspin:audio=29
 endef
