@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sendspin-cli
 PKG_VERSION:=0.4.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=sendspin-cpp-cli-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Sendspin/sendspin-cpp-cli/tar.gz/v$(PKG_VERSION)?
@@ -50,8 +50,9 @@ endef
 
 define Package/sendspin-cli/description
   Headless player for Sendspin, the synchronized multi-room audio protocol
-  used by Music Assistant. It plays through ALSA and is announced over mDNS
-  so a Sendspin server can discover it.
+  used by Music Assistant. It plays through ALSA, can stream a line-in or
+  microphone to the server, and is announced over mDNS so a Sendspin server
+  can discover it.
 endef
 
 define Package/sendspin-cli/conffiles
@@ -144,6 +145,8 @@ define Package/sendspin-cli/install
 	$(INSTALL_BIN) ./files/sendspin-cli.init $(1)/etc/init.d/sendspin-cli
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_DATA) ./files/sendspin-cli.hotplug $(1)/etc/hotplug.d/iface/50-sendspin-cli
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/sound
+	$(INSTALL_DATA) ./files/sendspin-cli.sound-hotplug $(1)/etc/hotplug.d/sound/50-sendspin-cli
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/sendspin-cli.defaults $(1)/etc/uci-defaults/50-sendspin-cli
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
