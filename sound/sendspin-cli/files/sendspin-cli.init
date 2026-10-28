@@ -15,6 +15,7 @@ validate_player_section() {
 		'enabled:bool:0' \
 		'name:string' \
 		'device:string:hw:0,0' \
+		'input:string' \
 		'audio_format:string' \
 		'buffer_ms:range(10,2000):100' \
 		'output_delay:uinteger:0' \
@@ -26,7 +27,46 @@ validate_player_section() {
 		'state_dir:string:/etc/sendspin-cli'
 }
 
+# The /proc/asound directory of the capture device an ALSA input names, such
+# as default, hw:1,0 or plughw:CARD=Device,DEV=0. Fails for anything else,
+# which is left for the player to judge.
+input_capture_dir() {
+	local spec="${1#alsa:}" args card dev=0 field position=0
+
+	case "$spec" in
+	default | sysdefault)
+		# default can be redefined there, as anything at all
+		[ -e /etc/asound.conf ] && return 1
+		card=0
+		;;
+	hw:* | plughw:* | sysdefault:* | dsnoop:*)
+		args="${spec#*:}"
+		local IFS=,
+		for field in $args; do
+			case "$field" in
+			CARD=*) card="${field#CARD=}" ;;
+			DEV=*) dev="${field#DEV=}" ;;
+			*=*) ;;
+			*)
+				[ "$position" = 0 ] && card="$field"
+				[ "$position" = 1 ] && dev="$field"
+				;;
+			esac
+			position=$((position + 1))
+		done
+		;;
+	*) return 1 ;;
+	esac
+
+	case "${card:-0}" in
+	*[!0-9]*) echo "/proc/asound/$card/pcm${dev}c" ;;
+	*) echo "/proc/asound/card${card:-0}/pcm${dev}c" ;;
+	esac
+}
+
 start_player() {
+	local capture_dir missing_input
+
 	[ "$2" = 0 ] || {
 		echo "validation failed"
 		return 1
@@ -35,6 +75,15 @@ start_player() {
 	[ "$enabled" = 1 ] || return 0
 
 	[ -n "$name" ] || name="$(cat /proc/sys/kernel/hostname)"
+
+	# The player refuses to start on an input it cannot open, and would take
+	# playback down with it, so a missing card only costs the input. The
+	# sound hotplug script starts the player again once the card appears.
+	if [ -n "$input" ] && capture_dir="$(input_capture_dir "$input")" && [ ! -d "$capture_dir" ]; then
+		logger -t sendspin-cli "$1: no capture device for input '$input'; playing without it until one appears"
+		missing_input="$capture_dir"
+		input=""
+	fi
 
 	mkdir -p "$state_dir" "$RUN_DIR"
 	chown sendspin:audio "$state_dir" "$RUN_DIR"
@@ -50,8 +99,13 @@ start_player() {
 		--state-dir "$state_dir" \
 		--control-socket "$RUN_DIR/$1.sock" \
 		--no-mdns
+	[ -n "$input" ] && procd_append_param command --input "$input"
 	[ -n "$audio_format" ] && procd_append_param command --audio-format "$audio_format"
 	[ "$allow_unpaired" = 1 ] && procd_append_param command --allow-unpaired
+
+	# One data table for both, since each would otherwise add its own
+	procd_open_data
+	[ -n "$missing_input" ] && json_add_string input_missing "$missing_input"
 
 	# The player is built without mDNS; umdns announces it instead
 	if [ -n "$server" ]; then
@@ -59,6 +113,7 @@ start_player() {
 	elif [ "$mdns" = 1 ]; then
 		procd_add_mdns "sendspin" "tcp" "$port" "path=/sendspin" "name=$name"
 	fi
+	procd_close_data
 
 	procd_set_param user sendspin
 	procd_set_param group audio

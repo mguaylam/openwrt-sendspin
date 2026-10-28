@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# A player whose input had no capture device when it started plays without
+# it, and names the /proc/asound directory it waits for. Once that appears,
+# start the player again with its input. The restart ends any stream it is
+# playing, which is why only such a player is restarted.
+
+[ "$ACTION" = add ] || exit 0
+
+case "$DEVNAME" in
+snd/pcmC*D*c) ;;
+*) exit 0 ;;
+esac
+
+missing="$(ubus call service list '{"name":"sendspin-cli"}' 2> /dev/null |
+	jsonfilter -e '@["sendspin-cli"].instances[*].data.input_missing')" || exit 0
+
+# The event can come before the card's /proc/asound entries, so give them a
+# moment without holding up the other hotplug scripts
+(
+	tries=5
+	while [ "$tries" -gt 0 ]; do
+		for dir in $missing; do
+			[ -d "$dir" ] || continue
+			logger -t sendspin-cli "Restarting to capture from $dir after $DEVNAME appeared"
+			/etc/init.d/sendspin-cli restart > /dev/null 2>&1
+			exit 0
+		done
+		sleep 1
+		tries=$((tries - 1))
+	done
+) &

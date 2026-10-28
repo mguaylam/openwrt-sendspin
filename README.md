@@ -27,6 +27,7 @@ feed is where it is developed and tested until it lands there.
 | Rediscovery after a service restart | verified |
 | Rediscovery after a router reboot | works through a workaround for umdns, but not every time — see [known limitations](#known-limitations) |
 | USB DAC unplugged and plugged back during playback | verified on 0.3.0, twice in one track, with no workaround |
+| Line-in or microphone streamed to the server (`input`) | written, not yet tried: neither DAC under test captures |
 | Big-endian targets (e.g. ath79) | not offered: the audio is correct, but noise-c's encryption is wrong there, reproduced — see [known limitations](#known-limitations) |
 
 ## Hardware under test
@@ -140,6 +141,41 @@ password: whoever holds it can pair a server.
 
 Setting `allow_unpaired` lets any server play without pairing. Connections
 are encrypted either way.
+
+### Line-in and microphone
+
+Setting `input` makes the player a Sendspin source as well: it captures from
+a sound card and streams that audio to the server, for a turntable on a
+line-in or a microphone in a room. Music Assistant shows it as a Live Input
+through its
+[Sendspin Source](https://www.music-assistant.io/plugins/sendspin-source/)
+plugin, which only takes paired players: `allow_unpaired` does not open the
+input to an unpaired server.
+
+```sh
+uci set sendspin-cli.main.input='hw:1,0'
+uci commit sendspin-cli
+service sendspin-cli restart
+```
+
+`sendspin-cli -l` lists the capture devices under the outputs; a card has one
+when `/proc/asound/card*/` holds a `pcm*c` directory. `tone` streams a 440 Hz
+test tone instead, which checks the path to the server without a sound card.
+
+- Nothing is captured until the server starts the input, and the device is
+  released when it stops it. The server starts it by hand: the player does
+  not report whether a signal is present, so a server cannot start it when a
+  record begins.
+- The capture runs at 48 kHz, 16-bit, stereo if the card takes it, otherwise
+  the nearest it does take, and is sent as PCM: about 1.5 Mbit/s, with
+  nothing to encode on the router.
+- The player refuses to start on an input it cannot open, which would take
+  playback down with it. So when the card an ALSA input names, such as
+  `default`, `hw:1,0` or `plughw:CARD=Device,DEV=0`, has no capture device at
+  startup, the init script starts the player without its input and logs it.
+  `/etc/hotplug.d/sound/50-sendspin-cli` restarts the player once the device
+  appears, which ends any stream playing at the time. A card unplugged and
+  plugged back while the player runs is reopened by the player itself.
 
 ### Routers with more than one network
 
