@@ -32,7 +32,7 @@ feed is where it is developed and tested until it lands there.
 ## Hardware under test
 
 - **D-Link DIR-3040 A1** — `ramips/mt7621`, MediaTek MT7621AT (MIPS 1004Kc,
-  2 cores / 4 threads, 880 MHz, no FPU), 256 MB RAM, OpenWrt 25.12.5.
+  2 cores / 4 threads, 880 MHz, no FPU), 256 MB RAM, OpenWrt 25.12.6.
 - **USB audio adapter** — generic "Yichip USB-Audio" (`12d1:3a06`), USB full
   speed, UAC1. It plays **16-bit / 48 kHz stereo only**, so that is the format
   this setup targets.
