@@ -129,3 +129,21 @@ jobs:
             -v "$PWD/ci:/ci" \
             "openwrt/rootfs:$ROOTFS" \
             /scripts/test_entrypoint.sh
+
+  # The one check the ruleset on main requires, so a release bump in the
+  # matrix leaves the ruleset alone. It passes only when every build passed;
+  # a snapshot build that fails under continue-on-error counts as passed here,
+  # as it did when the ruleset named the release builds one by one.
+  result:
+    name: Build result
+    needs: [packages, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every build passed
+        env:
+          PACKAGES: ${{ needs.packages.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          echo "packages: $PACKAGES, build: $BUILD"
+          test "$PACKAGES" = success && test "$BUILD" = success
