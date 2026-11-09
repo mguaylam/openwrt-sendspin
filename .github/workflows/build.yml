@@ -48,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         release:
-          - 25.12.5
+          - 25.12.6
           - main
         target:
           - ramips-mt7621     # mipsel_24kc: little-endian, soft-float (test hardware)
@@ -60,8 +60,8 @@ jobs:
         # is one of the images openwrt/packages runs its own test on.
         include:
           - target: x86-64
-            release: 25.12.5
-            rootfs: x86_64-25.12.5
+            release: 25.12.6
+            rootfs: x86_64-25.12.6
           - target: x86-64
             release: main
             rootfs: x86_64-master
@@ -129,3 +129,21 @@ jobs:
             -v "$PWD/ci:/ci" \
             "openwrt/rootfs:$ROOTFS" \
             /scripts/test_entrypoint.sh
+
+  # The one check the ruleset on main requires, so a release bump in the
+  # matrix leaves the ruleset alone. It passes only when every build passed;
+  # a snapshot build that fails under continue-on-error counts as passed here,
+  # as it did when the ruleset named the release builds one by one.
+  result:
+    name: Build result
+    needs: [packages, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every build passed
+        env:
+          PACKAGES: ${{ needs.packages.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          echo "packages: $PACKAGES, build: $BUILD"
+          test "$PACKAGES" = success && test "$BUILD" = success

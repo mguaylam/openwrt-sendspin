@@ -32,7 +32,7 @@ feed is where it is developed and tested until it lands there.
 ## Hardware under test
 
 - **D-Link DIR-3040 A1** — `ramips/mt7621`, MediaTek MT7621AT (MIPS 1004Kc,
-  2 cores / 4 threads, 880 MHz, no FPU), 256 MB RAM, OpenWrt 25.12.5.
+  2 cores / 4 threads, 880 MHz, no FPU), 256 MB RAM, OpenWrt 25.12.6.
 - **USB audio adapter** — generic "Yichip USB-Audio" (`12d1:3a06`), USB full
   speed, UAC1. It plays **16-bit / 48 kHz stereo only**, so that is the format
   this setup targets.
@@ -60,7 +60,7 @@ this repository:
 
 ```sh
 git clone https://github.com/openwrt/gh-action-sdk.git
-podman build --build-arg ARCH=ramips-mt7621-25.12.5 -t openwrt-sdk-mt7621 gh-action-sdk
+podman build --build-arg ARCH=ramips-mt7621-25.12.6 -t openwrt-sdk-mt7621 gh-action-sdk
 mkdir -p out
 podman run --rm --userns=keep-id \
   -e PACKAGES=sendspin-cli -e FEEDNAME=sendspin \
@@ -69,8 +69,8 @@ podman run --rm --userns=keep-id \
 ```
 
 The package lands in `out/bin/packages/mipsel_24kc/sendspin/`. Other targets
-use the matching image tag, e.g. `ath79-generic-25.12.5`,
-`mediatek-filogic-25.12.5` or `x86-64-25.12.5`.
+use the matching image tag, e.g. `ath79-generic-25.12.6`,
+`mediatek-filogic-25.12.6` or `x86-64-25.12.6`.
 
 ### In an existing SDK or buildroot
 
@@ -274,7 +274,7 @@ limit. The list below is the tactical work; that page is the coverage story.
 ## Continuous integration
 
 Every pull request, and every push to `main`, builds the feed with
-gh-action-sdk against OpenWrt 25.12.5 and the snapshot SDK:
+gh-action-sdk against OpenWrt 25.12.6 and the snapshot SDK:
 
 | Target | Package arch | Why |
 |---|---|---|
